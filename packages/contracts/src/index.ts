@@ -1,5 +1,6 @@
 export const CONTRACT_VERSION = 'v1' as const;
 
+export * from './config.js';
 export * from './errors.js';
 export * from './events.js';
 export * from './ids.js';
