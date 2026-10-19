@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./apps/web" },
+    { "path": "./apps/server" },
+    { "path": "./packages/contracts" },
+    { "path": "./packages/domain" },
+    { "path": "./packages/application" },
+    { "path": "./packages/storage-sqlite" },
+    { "path": "./packages/model-gateway" },
+    { "path": "./packages/story-context" },
+    { "path": "./packages/quality" }
+  ]
+}

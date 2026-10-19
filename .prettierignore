@@ -1,0 +1,5 @@
+.git/
+.paseo/
+docs/
+node_modules/
+**/dist/
