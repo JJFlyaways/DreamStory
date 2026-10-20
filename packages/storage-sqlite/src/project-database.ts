@@ -2,13 +2,22 @@ import { existsSync, statSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 import Database from 'better-sqlite3';
+import type { RepositorySet } from '@dreamstory/application';
 
 import {
   openSqliteDatabase,
   type SqliteConnection,
   type SqliteConnectionOptions,
 } from './connection.js';
-import { readSchemaVersion } from './migration-runner.js';
+import { createDrizzleDatabase, type StoryDatabase } from './drizzle.js';
+import { INITIAL_MIGRATIONS } from './migrations/index.js';
+import {
+  readSchemaVersion,
+  runMigrations,
+  type MigrationResult,
+  type MigrationRunnerOptions,
+} from './migration-runner.js';
+import { createSqliteRepositories } from './repositories.js';
 
 export const PROJECT_DIRECTORY_NAME = '.dreamstory';
 export const DATABASE_FILE_NAME = 'story.sqlite';
@@ -24,6 +33,16 @@ export interface ProjectDatabaseProbe {
   reason?: 'not_a_file' | 'open_failed' | 'integrity_failed' | 'not_wal';
 }
 
+export interface InitializeProjectDatabaseOptions
+  extends SqliteConnectionOptions, MigrationRunnerOptions {}
+
+export interface InitializedProjectDatabase {
+  connection: SqliteConnection;
+  database: StoryDatabase;
+  repositories: RepositorySet;
+  migration: MigrationResult;
+}
+
 export function getProjectDatabasePath(projectRoot: string): string {
   return join(resolve(projectRoot), PROJECT_DIRECTORY_NAME, DATABASE_FILE_NAME);
 }
@@ -33,6 +52,28 @@ export function openProjectDatabase(
   options: SqliteConnectionOptions = {},
 ): SqliteConnection {
   return openSqliteDatabase(getProjectDatabasePath(projectRoot), options);
+}
+
+export async function initializeProjectDatabase(
+  projectRoot: string,
+  options: InitializeProjectDatabaseOptions = {},
+): Promise<InitializedProjectDatabase> {
+  const connection = openProjectDatabase(projectRoot, options);
+
+  try {
+    const migration = await runMigrations(connection, INITIAL_MIGRATIONS, options);
+    const database = createDrizzleDatabase(connection);
+
+    return {
+      connection,
+      database,
+      repositories: createSqliteRepositories(database),
+      migration,
+    };
+  } catch (error) {
+    connection.close();
+    throw error;
+  }
 }
 
 export function probeProjectDatabase(projectRoot: string): ProjectDatabaseProbe {

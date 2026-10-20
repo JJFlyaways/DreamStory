@@ -6,5 +6,6 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "types": ["node"]
   },
+  "references": [{ "path": "../contracts" }, { "path": "../application" }],
   "include": ["src"]
 }

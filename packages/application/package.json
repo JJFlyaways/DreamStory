@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "dependencies": {
+    "@dreamstory/contracts": "workspace:*"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

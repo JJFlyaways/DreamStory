@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import {
   getProjectDatabasePath,
+  initializeProjectDatabase,
   MigrationError,
   openProjectDatabase,
   openSqliteDatabase,
@@ -137,6 +138,90 @@ test('probes missing, ready, and invalid project databases', async () => {
     await writeFile(ready.databasePath, 'not a sqlite database');
     const invalid = probeProjectDatabase(directory);
     assert.equal(invalid.status, 'invalid');
+  } finally {
+    await removeTestDirectory(directory);
+  }
+});
+
+test('initializes the operational schema and provides repository adapters', async () => {
+  const directory = await createTestDirectory();
+  try {
+    const initialized = await initializeProjectDatabase(directory, {
+      backupDirectory: join(directory, '.dreamstory', 'backups'),
+      now: new Date('2026-10-20T12:34:56.789Z'),
+    });
+
+    assert.equal(initialized.migration.currentVersion, 1);
+    assert.deepEqual(
+      initialized.connection.db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .pluck()
+        .all(),
+      ['command_receipts', 'outbox_jobs', 'runs'],
+    );
+
+    const createdAt = '2026-10-20T12:34:56.000Z';
+    const receipt = {
+      bookId: 'book_01',
+      commandKind: 'create_book',
+      clientRequestId: 'c6595f8b-2583-4ccc-9569-62d273282eb9',
+      result: { bookId: 'book_01' },
+      createdAt,
+    };
+    await initialized.repositories.commandReceipts.save(receipt);
+    await initialized.repositories.commandReceipts.save({ ...receipt, result: { changed: true } });
+    assert.deepEqual(
+      await initialized.repositories.commandReceipts.find(
+        receipt.bookId,
+        receipt.commandKind,
+        receipt.clientRequestId,
+      ),
+      receipt,
+    );
+
+    const outboxJob = {
+      id: 'job_01',
+      kind: 'refresh_export',
+      sourceId: 'finalization_01',
+      sourceHash: `sha256:${'a'.repeat(64)}`,
+      status: 'pending',
+      attempts: 0,
+      lastError: null,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    await initialized.repositories.outboxJobs.enqueue(outboxJob);
+    assert.deepEqual(await initialized.repositories.outboxJobs.listPending(10), [outboxJob]);
+    await initialized.repositories.outboxJobs.markProcessing(outboxJob.id);
+    await initialized.repositories.outboxJobs.markFailed(outboxJob.id, 'temporary failure');
+    assert.deepEqual(
+      initialized.connection.db
+        .prepare('SELECT status, attempts, last_error FROM outbox_jobs WHERE id = ?')
+        .get(outboxJob.id),
+      { status: 'failed', attempts: 1, last_error: 'temporary failure' },
+    );
+
+    const run = {
+      id: 'run_01',
+      bookId: 'book_01',
+      intent: 'draft_chapter',
+      scope: { chapterNumbers: [1] },
+      status: 'queued',
+      inputSnapshotId: null,
+      lease: null,
+      attempt: 0,
+      error: null,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    await initialized.repositories.runs.create(run);
+    assert.deepEqual(await initialized.repositories.runs.get(run.id), run);
+    await initialized.repositories.runs.updateStatus(run.id, 'failed', { code: 'TEST_FAILURE' });
+    assert.deepEqual((await initialized.repositories.runs.get(run.id)).error, {
+      code: 'TEST_FAILURE',
+    });
+
+    initialized.connection.close();
   } finally {
     await removeTestDirectory(directory);
   }

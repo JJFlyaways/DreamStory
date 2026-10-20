@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "better-sqlite3": "13.0.3"
+    "@dreamstory/application": "workspace:*",
+    "@dreamstory/contracts": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
