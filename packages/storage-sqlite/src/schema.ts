@@ -23,6 +23,21 @@ export const runStatuses = [
 
 export const outboxJobStatuses = ['pending', 'processing', 'completed', 'failed'] as const;
 
+export const books = sqliteTable(
+  'books',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    language: text('language').notNull(),
+    genre: text('genre').notNull(),
+    premise: text('premise').notNull(),
+    bookRevision: integer('book_revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('books_updated_at_idx').on(table.updatedAt)],
+);
+
 export const commandReceipts = sqliteTable(
   'command_receipts',
   {
@@ -70,6 +85,7 @@ export const runs = sqliteTable(
 );
 
 export const schema = {
+  books,
   commandReceipts,
   outboxJobs,
   runs,

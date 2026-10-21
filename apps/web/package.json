@@ -3,7 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "start": "pnpm build && node dist/index.js",
+    "test": "pnpm build && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5"
   }
 }

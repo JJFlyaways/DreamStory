@@ -27,6 +27,35 @@ export interface CommandReceiptRepository {
   save(receipt: CommandReceiptRecord): Promise<void>;
 }
 
+export interface BookRecord {
+  id: StableId;
+  title: string;
+  language: string;
+  genre: string;
+  premise: string;
+  bookRevision: BookRevision;
+  createdAt: IsoUtcDateTime;
+  updatedAt: IsoUtcDateTime;
+}
+
+export interface BookChanges {
+  title?: string;
+  language?: string;
+  genre?: string;
+  premise?: string;
+}
+
+export interface BookRepository {
+  create(book: BookRecord): Promise<void>;
+  get(id: StableId): Promise<BookRecord | null>;
+  updateIfRevisionMatches(
+    id: StableId,
+    expectedBookRevision: BookRevision,
+    changes: BookChanges,
+    updatedAt: IsoUtcDateTime,
+  ): Promise<BookRecord | null>;
+}
+
 export interface OutboxJobRecord {
   id: StableId;
   kind: string;
@@ -68,6 +97,7 @@ export interface RunRepository {
 }
 
 export interface RepositorySet {
+  books: BookRepository;
   commandReceipts: CommandReceiptRepository;
   outboxJobs: OutboxJobRepository;
   runs: RunRepository;

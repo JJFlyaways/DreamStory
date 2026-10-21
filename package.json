@@ -9,6 +9,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "test": "pnpm -r --if-present test",
     "typecheck": "tsc -b"
   },
   "devDependencies": {

@@ -6,6 +6,8 @@ import {
 } from '@dreamstory/contracts';
 import type { ClientRequestId, IsoUtcDateTime, StableId } from '@dreamstory/contracts';
 import type {
+  BookRecord,
+  BookRepository,
   CommandReceiptRecord,
   CommandReceiptRepository,
   OutboxJobRecord,
@@ -17,14 +19,76 @@ import type {
 import { and, asc, eq } from 'drizzle-orm';
 
 import type { StoryDatabase } from './drizzle.js';
-import { commandReceipts, outboxJobs, runs } from './schema.js';
+import { books, commandReceipts, outboxJobs, runs } from './schema.js';
 
 export function createSqliteRepositories(database: StoryDatabase): RepositorySet {
   return {
+    books: new SqliteBookRepository(database),
     commandReceipts: new SqliteCommandReceiptRepository(database),
     outboxJobs: new SqliteOutboxJobRepository(database),
     runs: new SqliteRunRepository(database),
   };
+}
+
+export class SqliteBookRepository implements BookRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async create(book: BookRecord): Promise<void> {
+    this.database
+      .insert(books)
+      .values({
+        id: book.id,
+        title: book.title,
+        language: book.language,
+        genre: book.genre,
+        premise: book.premise,
+        bookRevision: book.bookRevision,
+        createdAt: book.createdAt,
+        updatedAt: book.updatedAt,
+      })
+      .run();
+  }
+
+  async get(id: StableId): Promise<BookRecord | null> {
+    const row = this.database.select().from(books).where(eq(books.id, id)).get();
+    return row === undefined ? null : mapBook(row);
+  }
+
+  async updateIfRevisionMatches(
+    id: StableId,
+    expectedBookRevision: BookRecord['bookRevision'],
+    changes: Parameters<BookRepository['updateIfRevisionMatches']>[2],
+    updatedAt: BookRecord['updatedAt'],
+  ): Promise<BookRecord | null> {
+    const values: {
+      title?: string;
+      language?: string;
+      genre?: string;
+      premise?: string;
+      bookRevision: number;
+      updatedAt: string;
+    } = {
+      bookRevision: expectedBookRevision + 1,
+      updatedAt,
+    };
+
+    if (changes.title !== undefined) values.title = changes.title;
+    if (changes.language !== undefined) values.language = changes.language;
+    if (changes.genre !== undefined) values.genre = changes.genre;
+    if (changes.premise !== undefined) values.premise = changes.premise;
+
+    const result = this.database
+      .update(books)
+      .set(values)
+      .where(and(eq(books.id, id), eq(books.bookRevision, expectedBookRevision)))
+      .run();
+
+    if (result.changes !== 1) {
+      return null;
+    }
+
+    return this.get(id);
+  }
 }
 
 export class SqliteCommandReceiptRepository implements CommandReceiptRepository {
@@ -178,6 +242,19 @@ function mapCommandReceipt(row: typeof commandReceipts.$inferSelect): CommandRec
     clientRequestId: parseClientRequestId(row.clientRequestId),
     result: parseJson(row.resultJson),
     createdAt: parseUtcDateTime(row.createdAt),
+  };
+}
+
+function mapBook(row: typeof books.$inferSelect): BookRecord {
+  return {
+    id: parseStableId(row.id),
+    title: row.title,
+    language: row.language,
+    genre: row.genre,
+    premise: row.premise,
+    bookRevision: row.bookRevision,
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
   };
 }
 

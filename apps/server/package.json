@@ -4,13 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@dreamstory/contracts": "workspace:*"
+    "@dreamstory/application": "workspace:*",
+    "@dreamstory/contracts": "workspace:*",
+    "@dreamstory/storage-sqlite": "workspace:*",
+    "fastify": "5.12.7"
   },
   "devDependencies": {
     "@types/node": "26.6.5"
   },
   "scripts": {
     "build": "tsc -b",
+    "start": "pnpm build && node dist/index.js",
     "test": "pnpm build && node --test test/*.test.mjs"
   }
 }

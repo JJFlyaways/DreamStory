@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { BookCommandError, BookService } from '../../application/dist/index.js';
 import {
   getProjectDatabasePath,
   initializeProjectDatabase,
@@ -74,6 +75,10 @@ test('creates a consistent backup before applying migrations', async () => {
     assert.equal(readSchemaVersion(connection.db), 2);
     assert.equal(connection.db.prepare('SELECT value FROM fixture').pluck().get(), 'ready');
     assert.equal(await readFile(result.backupPath, { encoding: 'utf8' }).then(() => true), true);
+    const backup = openSqliteDatabase(result.backupPath);
+    assert.equal(readSchemaVersion(backup.db), 0);
+    assert.throws(() => backup.db.prepare('SELECT * FROM fixture').all());
+    backup.close();
     connection.close();
   } finally {
     await removeTestDirectory(directory);
@@ -151,13 +156,13 @@ test('initializes the operational schema and provides repository adapters', asyn
       now: new Date('2026-10-20T12:34:56.789Z'),
     });
 
-    assert.equal(initialized.migration.currentVersion, 1);
+    assert.equal(initialized.migration.currentVersion, 2);
     assert.deepEqual(
       initialized.connection.db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .pluck()
         .all(),
-      ['command_receipts', 'outbox_jobs', 'runs'],
+      ['books', 'command_receipts', 'outbox_jobs', 'runs'],
     );
 
     const createdAt = '2026-10-20T12:34:56.000Z';
@@ -221,7 +226,60 @@ test('initializes the operational schema and provides repository adapters', asyn
       code: 'TEST_FAILURE',
     });
 
+    const service = new BookService(
+      initialized.repositories.books,
+      initialized.repositories.commandReceipts,
+    );
+    const created = await service.createBook({
+      bookId: 'book_02',
+      clientRequestId: 'b3b241cc-6f6e-4d98-a8e3-3e94d4e5c5dd',
+      title: '测试作品',
+      language: 'zh-CN',
+      genre: '悬疑',
+      premise: '验证作品生命周期。',
+      createdAt,
+    });
+    assert.equal(created.book.bookRevision, 1);
+    const replay = await service.createBook({
+      bookId: 'book_02',
+      clientRequestId: 'b3b241cc-6f6e-4d98-a8e3-3e94d4e5c5dd',
+      title: '不同标题',
+      language: 'zh-CN',
+      genre: '悬疑',
+      premise: '不应覆盖原结果。',
+      createdAt,
+    });
+    assert.equal(replay.replayed, true);
+    assert.deepEqual(replay.book, created.book);
+
+    const updates = await Promise.allSettled([
+      service.updateBook({
+        bookId: 'book_02',
+        clientRequestId: 'a4a0f5f8-7a7d-4dc7-ae84-b9c96d0f55c1',
+        expectedBookRevision: 1,
+        changes: { title: '并发更新 A' },
+        updatedAt: '2026-10-20T12:35:00.000Z',
+      }),
+      service.updateBook({
+        bookId: 'book_02',
+        clientRequestId: '18b8654e-c799-4bf1-9999-838e356e79f1',
+        expectedBookRevision: 1,
+        changes: { title: '并发更新 B' },
+        updatedAt: '2026-10-20T12:35:01.000Z',
+      }),
+    ]);
+    assert.equal(updates.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(updates.filter((result) => result.status === 'rejected').length, 1);
+    const rejection = updates.find((result) => result.status === 'rejected');
+    assert.equal(rejection.reason instanceof BookCommandError, true);
+    assert.equal(rejection.reason.code, 'REVISION_CONFLICT');
+
     initialized.connection.close();
+    const reopened = await initializeProjectDatabase(directory);
+    const persisted = await reopened.repositories.books.get('book_02');
+    assert.equal(persisted.bookRevision, 2);
+    assert.equal(persisted.title === '并发更新 A' || persisted.title === '并发更新 B', true);
+    reopened.connection.close();
   } finally {
     await removeTestDirectory(directory);
   }
