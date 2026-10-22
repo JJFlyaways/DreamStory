@@ -306,3 +306,82 @@ test('manages plan hierarchy, chapters, draft versions, conflicts, and restore',
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('lists books and rebuilds Markdown/TXT exports with consistent backups', async () => {
+  const directory = await createTestDirectory();
+  const config = createConfig(directory);
+  const app = createServer(config, new BookProjectManager(config.libraryRoot));
+  try {
+    const session = await app.inject({ method: 'GET', url: '/api/v1/session' });
+    const sessionBody = session.json();
+    const headers = {
+      origin: config.listen.allowedOrigins[0],
+      cookie: getCookie(session),
+      'x-story-csrf': sessionBody.data.csrfToken,
+    };
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/v1/books',
+      headers,
+      payload: {
+        clientRequestId: 'b3ef4e3c-23d6-4c4e-9ed4-5d7fba70f04c',
+        title: '导出测试书',
+        language: 'zh-CN',
+        genre: '现实情感',
+        premise: '验证导出和备份。',
+        conventions: { viewpoint: '第一人称', tone: '克制' },
+      },
+    });
+    assert.equal(create.statusCode, 201);
+    const bookId = create.json().data.id;
+
+    const shelf = await app.inject({ method: 'GET', url: '/api/v1/books' });
+    assert.equal(shelf.statusCode, 200);
+    assert.equal(shelf.json().data.length, 1);
+    assert.equal(shelf.json().data[0].book.title, '导出测试书');
+    assert.deepEqual(shelf.json().data[0].book.conventions, {
+      viewpoint: '第一人称',
+      tone: '克制',
+    });
+
+    const markdownExport = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/exports`,
+      headers,
+      payload: { format: 'markdown' },
+    });
+    assert.equal(markdownExport.statusCode, 201);
+    assert.match(markdownExport.json().data.contentHash, /^sha256:[0-9a-f]{64}$/);
+    assert.equal(markdownExport.json().data.fileName, `${bookId}.md`);
+
+    const markdown = await app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${bookId}/exports/markdown`,
+    });
+    assert.equal(markdown.statusCode, 200);
+    assert.match(markdown.body, /# 导出测试书/);
+    assert.match(markdown.body, /第一人称/);
+
+    const textExport = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/exports`,
+      headers,
+      payload: { format: 'txt' },
+    });
+    assert.equal(textExport.statusCode, 201);
+    assert.equal(textExport.json().data.fileName, `${bookId}.txt`);
+
+    const backup = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/backups`,
+      headers,
+    });
+    assert.equal(backup.statusCode, 201);
+    assert.match(backup.json().data.relativePath, /^backups\/story\.\d+T\d+Z\.sqlite$/);
+    assert.equal(backup.json().data.relativePath.includes(directory), false);
+    assert.equal(backup.json().data.sizeBytes > 0, true);
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

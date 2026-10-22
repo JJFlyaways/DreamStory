@@ -13,6 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "test": "pnpm build && node --test test/*.test.mjs"
   }
 }

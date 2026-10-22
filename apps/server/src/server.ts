@@ -1,4 +1,6 @@
-import { isAbsolute, relative, resolve } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 
 import {
@@ -8,8 +10,11 @@ import {
   DraftService,
   PlanService,
   WritingCommandError,
+  renderBookExport,
   type CreateBookCommand,
   type CreateChapterCommand,
+  type ExportFormat,
+  type BookRecord,
   type PlanNodeCommand,
   type RestoreDraftCommand,
   type SaveDraftCommand,
@@ -29,6 +34,8 @@ import {
   type StableId,
 } from '@dreamstory/contracts';
 import {
+  createConsistentBackup,
+  createMigrationBackupPath,
   initializeProjectDatabase,
   probeProjectDatabase,
   type InitializedProjectDatabase,
@@ -46,6 +53,28 @@ export interface HealthResponse {
     status: ProjectDatabaseProbe['status'] | 'not_selected';
     schemaVersion: number | null;
   };
+}
+
+export interface BookShelfEntry {
+  bookId: StableId;
+  status: 'ready' | 'invalid';
+  schemaVersion: number | null;
+  book: BookRecord | null;
+}
+
+export interface BackupResult {
+  fileName: string;
+  relativePath: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface ExportResult {
+  format: ExportFormat;
+  fileName: string;
+  characterCount: number;
+  contentHash: string;
+  updatedAt: string;
 }
 
 export class BookProjectManager {
@@ -83,6 +112,57 @@ export class BookProjectManager {
   async getBook(bookId: StableId) {
     const initialized = await this.openBook(bookId);
     return initialized.repositories.books.get(bookId);
+  }
+
+  async listBooks(): Promise<readonly BookShelfEntry[]> {
+    let entries;
+    try {
+      entries = await readdir(this.root, { withFileTypes: true });
+    } catch (error) {
+      if (isNodeError(error, 'ENOENT')) {
+        return [];
+      }
+      throw error;
+    }
+
+    const books: BookShelfEntry[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !/^book_[0-9a-f-]+$/i.test(entry.name)) {
+        continue;
+      }
+      const bookId = parseBookId(entry.name);
+      const probe = this.probe(bookId);
+      if (probe.status !== 'ready') {
+        books.push({
+          bookId,
+          status: 'invalid',
+          schemaVersion: probe.schemaVersion,
+          book: null,
+        });
+        continue;
+      }
+      try {
+        books.push({
+          bookId,
+          status: 'ready',
+          schemaVersion: probe.schemaVersion,
+          book: await this.getBook(bookId),
+        });
+      } catch {
+        books.push({
+          bookId,
+          status: 'invalid',
+          schemaVersion: probe.schemaVersion,
+          book: null,
+        });
+      }
+    }
+
+    return books.sort((left, right) => {
+      const leftTime = left.book?.updatedAt ?? '';
+      const rightTime = right.book?.updatedAt ?? '';
+      return rightTime.localeCompare(leftTime);
+    });
   }
 
   async updateBook(command: UpdateBookCommand) {
@@ -168,6 +248,62 @@ export class BookProjectManager {
       initialized.repositories.drafts,
       initialized.repositories.commandReceipts,
     ).restore(command);
+  }
+
+  async createBackup(bookId: StableId): Promise<BackupResult> {
+    const initialized = await this.openBook(bookId);
+    const databasePath = initialized.connection.databasePath;
+    const backupDirectory = join(dirname(databasePath), 'backups');
+    const backupPath = createMigrationBackupPath(databasePath, { backupDirectory });
+    await createConsistentBackup(initialized.connection.db, backupPath);
+    const backupStats = await stat(backupPath);
+    return {
+      fileName: basename(backupPath),
+      relativePath: `backups/${basename(backupPath)}`,
+      sizeBytes: backupStats.size,
+      createdAt: nowUtc(),
+    };
+  }
+
+  async exportBook(bookId: StableId, format: ExportFormat): Promise<ExportResult> {
+    const initialized = await this.openBook(bookId);
+    const book = await initialized.repositories.books.get(bookId);
+    if (book === null) {
+      throw new BookCommandError('NOT_FOUND', 'The book does not exist.');
+    }
+    const plans = await initialized.repositories.plans.list(bookId);
+    const chapters = await initialized.repositories.chapters.list(bookId);
+    const draftsByChapter = new Map();
+    for (const chapter of chapters) {
+      draftsByChapter.set(chapter.id, await initialized.repositories.drafts.current(chapter.id));
+    }
+    const content = renderBookExport({ book, plans, chapters, draftsByChapter }, format);
+    const exportDirectory = join(this.projectRoot(bookId), 'exports');
+    await mkdir(exportDirectory, { recursive: true });
+    const fileName = `${bookId}.${format === 'markdown' ? 'md' : 'txt'}`;
+    const exportPath = join(exportDirectory, fileName);
+    const temporaryPath = join(exportDirectory, `.${fileName}.${randomUUID()}.tmp`);
+    await writeFile(temporaryPath, content, 'utf8');
+    await rename(temporaryPath, exportPath);
+    return {
+      format,
+      fileName,
+      characterCount: Array.from(content).length,
+      contentHash: `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`,
+      updatedAt: nowUtc(),
+    };
+  }
+
+  async readExport(bookId: StableId, format: ExportFormat): Promise<string> {
+    const fileName = `${bookId}.${format === 'markdown' ? 'md' : 'txt'}`;
+    try {
+      return await readFile(join(this.projectRoot(bookId), 'exports', fileName), 'utf8');
+    } catch (error) {
+      if (isNodeError(error, 'ENOENT')) {
+        throw new BookCommandError('NOT_FOUND', 'The export does not exist.');
+      }
+      throw error;
+    }
   }
 
   probe(bookId: StableId): ProjectDatabaseProbe {
@@ -258,6 +394,14 @@ export function createServer(
     return { data: issued.session };
   });
 
+  app.get('/api/v1/books', async (_request, reply) => {
+    try {
+      return { data: await projectManager.listBooks() };
+    } catch (error) {
+      return sendCommandError(reply, _request, error);
+    }
+  });
+
   app.post('/api/v1/books', async (request, reply) => {
     if (!requireWriteSecurity(request, reply, sessions)) {
       return;
@@ -273,6 +417,7 @@ export function createServer(
         language: body.language,
         genre: body.genre,
         premise: body.premise,
+        ...(body.conventions === undefined ? {} : { conventions: body.conventions }),
         createdAt: nowUtc(),
       };
       const result = await projectManager.createBook(command);
@@ -314,6 +459,53 @@ export function createServer(
       return sendCommandError(reply, request, error);
     }
   });
+
+  app.post<{ Params: { bookId: string } }>(
+    '/api/v1/books/:bookId/backups',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) {
+        return;
+      }
+      try {
+        const result = await projectManager.createBackup(parseBookId(request.params.bookId));
+        return reply.code(201).send({ data: result });
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { bookId: string } }>(
+    '/api/v1/books/:bookId/exports',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) {
+        return;
+      }
+      try {
+        const format = parseExportFormat(asRecord(request.body)['format']);
+        const result = await projectManager.exportBook(parseBookId(request.params.bookId), format);
+        return reply.code(201).send({ data: result });
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { bookId: string; format: string } }>(
+    '/api/v1/books/:bookId/exports/:format',
+    async (request, reply) => {
+      try {
+        const format = parseExportFormat(request.params.format);
+        const content = await projectManager.readExport(parseBookId(request.params.bookId), format);
+        reply.type(
+          format === 'markdown' ? 'text/markdown; charset=utf-8' : 'text/plain; charset=utf-8',
+        );
+        return reply.send(content);
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
 
   app.get<{ Params: { bookId: string }; Querystring: { includeSuperseded?: string } }>(
     '/api/v1/books/:bookId/plans',
@@ -559,6 +751,7 @@ function parseCreateBookBody(value: unknown): {
   language: string;
   genre: string;
   premise: string;
+  conventions?: Record<string, unknown>;
 } {
   const record = asRecord(value);
   return {
@@ -567,6 +760,9 @@ function parseCreateBookBody(value: unknown): {
     language: requiredString(record['language']),
     genre: requiredString(record['genre']),
     premise: requiredString(record['premise']),
+    ...(record['conventions'] === undefined
+      ? {}
+      : { conventions: objectValue(record['conventions'], 'conventions') }),
   };
 }
 
@@ -590,6 +786,9 @@ function parseUpdateBookBody(value: unknown): {
     if (record[field] !== undefined) {
       changes[field] = requiredString(record[field]);
     }
+  }
+  if (record['conventions'] !== undefined) {
+    changes.conventions = objectValue(record['conventions'], 'conventions');
   }
 
   if (Object.keys(changes).length === 0) {
@@ -693,6 +892,13 @@ function parseDraftRestoreBody(value: unknown): {
   };
 }
 
+function parseExportFormat(value: unknown): ExportFormat {
+  if (value === 'markdown' || value === 'txt') {
+    return value;
+  }
+  throw new Error('format must be markdown or txt.');
+}
+
 function parsePlanContent(value: unknown): PlanContent {
   const record = asRecord(value);
   const targetLength = record['targetLength'];
@@ -779,8 +985,19 @@ function stringValue(value: unknown): string {
   return value;
 }
 
+function objectValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
 function nowUtc() {
   return parseUtcDateTime(new Date().toISOString());
+}
+
+function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error && error.code === code;
 }
 
 function requireWriteSecurity(
