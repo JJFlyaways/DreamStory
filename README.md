@@ -1,7 +1,20 @@
-# DreamStory
+<div align="center">
+  <img src="branding/final/digital/dreamstory-symbol-color-512.png" width="100" height="100" alt="DreamStory Logo">
+  <h1>DreamStory</h1>
+</div>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental">
+  <img src="https://img.shields.io/badge/local--first-AI%20writing-6BC8C1" alt="Local-first AI writing">
+  <img src="https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white" alt="SQLite storage">
+</p>
+
+---
+
+## Introduction
 
 DreamStory is a local-first AI workspace for novel writing. It helps authors plan stories, manage characters and world
-building, write chapters, review draft history, and keep long-term continuity in one place.
+building, write chapters, review draft history, and maintain long-term continuity in one place.
 
 ## License
 
