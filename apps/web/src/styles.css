@@ -758,6 +758,24 @@ select {
   color: #7c8888;
   font-size: 11px;
 }
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.draft-preview {
+  max-height: 60vh;
+  overflow: auto;
+  margin: 0;
+  padding: 20px;
+  color: #273b40;
+  background: rgba(255, 255, 255, 0.45);
+  white-space: pre-wrap;
+  font:
+    16px/1.9 Georgia,
+    'Songti SC',
+    serif;
+}
 .text-button {
   padding: 4px 0;
   color: var(--teal-deep);

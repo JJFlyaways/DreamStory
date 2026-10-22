@@ -805,6 +805,7 @@ function WritingWorkspace({
   const [saveState, setSaveState] = useState<'未保存' | '保存中' | '已保存' | '冲突' | '失败'>(
     '已保存',
   );
+  const [previewDraft, setPreviewDraft] = useState<DraftVersion | null>(null);
   const loadedChapterRef = useRef<string | null>(null);
   const draftRevisionRef = useRef(current?.revision ?? 0);
   const lastSavedContentRef = useRef(current?.content ?? '');
@@ -929,9 +930,18 @@ function WritingWorkspace({
         <DraftHistory
           drafts={drafts}
           currentDraftId={current?.id ?? null}
+          onPreview={setPreviewDraft}
           onRestore={(draftId) => restoreMutation.mutate(draftId)}
           isRestoring={restoreMutation.isPending}
         />
+        {previewDraft && (
+          <Dialog
+            title={`只读预览 · 版本 ${previewDraft.revision}`}
+            onClose={() => setPreviewDraft(null)}
+          >
+            <pre className="draft-preview">{previewDraft.content || '（空草稿）'}</pre>
+          </Dialog>
+        )}
       </section>
       <aside className="writing-context">
         <p className="eyebrow">本章航线</p>
@@ -967,11 +977,13 @@ function WritingWorkspace({
 function DraftHistory({
   drafts,
   currentDraftId,
+  onPreview,
   onRestore,
   isRestoring,
 }: {
   drafts: DraftVersion[];
   currentDraftId: string | null;
+  onPreview: (draft: DraftVersion) => void;
   onRestore: (draftId: string) => void;
   isRestoring: boolean;
 }) {
@@ -1000,15 +1012,20 @@ function DraftHistory({
                   {draft.complete ? '完整' : '进行中'}
                 </span>
               </div>
-              {draft.id !== currentDraftId && (
-                <button
-                  className="text-button"
-                  disabled={isRestoring}
-                  onClick={() => onRestore(draft.id)}
-                >
-                  恢复为新版本
+              <div className="history-actions">
+                <button className="text-button" onClick={() => onPreview(draft)}>
+                  预览
                 </button>
-              )}
+                {draft.id !== currentDraftId && (
+                  <button
+                    className="text-button"
+                    disabled={isRestoring}
+                    onClick={() => onRestore(draft.id)}
+                  >
+                    恢复
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
