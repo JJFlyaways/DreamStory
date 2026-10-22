@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Open Book lockup exploration</title>
+  <g id="symbol">
+    <path fill="#111111" d="M24 56 C60 34 94 34 128 52 C162 34 196 34 232 56 V204 C196 185 163 186 128 207 C93 186 60 185 24 204 Z"/>
+    <path d="M128 56 V202" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+    <path d="M48 94 C69 85 91 86 111 96 M48 128 C69 119 91 120 111 130 M145 96 C165 86 187 85 208 94 M145 130 C165 120 187 119 208 128" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

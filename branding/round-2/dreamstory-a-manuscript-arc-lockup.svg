@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Manuscript Arc lockup exploration</title>
+  <g id="symbol">
+    <path fill="#111111" fill-rule="evenodd" d="M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z M156 28 V92 H220 Z"/>
+    <path d="M62 108 H184 M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

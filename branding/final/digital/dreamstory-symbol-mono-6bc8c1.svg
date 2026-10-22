@@ -1,0 +1,12 @@
+<svg fill="#6bc8c1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title"><title>DreamStory logo</title>
+  <title id="title">DreamStory color symbol</title>
+
+    <g id="symbol">
+      <path fill="#6bc8c1" d="M54 24H202A20 20 0 0 1 222 44V212A20 20 0 0 1 202 232H54A20 20 0 0 1 34 212V44A20 20 0 0 1 54 24Z"/>
+      <path fill="#6bc8c1" d="M34 24H68V232H34Z"/>
+      <path fill="#6bc8c1" d="M86 48H194A8 8 0 0 1 202 56V200A8 8 0 0 1 194 208H86Z"/>
+      <path fill="#6bc8c1" d="M104 104C104 84 116 72 136 72V94C125 94 120 100 120 112V130H104Z"/>
+      <path fill="#6bc8c1" d="M148 104C148 84 160 72 180 72V94C169 94 164 100 164 112V130H148Z"/>
+    </g>
+
+</svg>

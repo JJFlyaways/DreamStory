@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Book &amp; Quote lockup exploration</title>
+  <g id="symbol">
+    <path fill="#111111" d="M44 24 H212 V232 H44 A20 20 0 0 1 24 212 V44 A20 20 0 0 1 44 24 Z"/>
+    <path fill="#111111" d="M24 24 H58 V232 H24 Z"/>
+    <path fill="#FFFFFF" d="M76 48 H192 V208 H76 Z"/>
+    <path fill="#111111" d="M94 104 C94 84 106 72 126 72 V94 C115 94 110 100 110 112 V130 H94 Z"/>
+    <path fill="#111111" d="M138 104 C138 84 150 72 170 72 V94 C159 94 154 100 154 112 V130 H138 Z"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

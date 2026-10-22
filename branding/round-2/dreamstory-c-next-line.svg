@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Next Line concept</title>
+  <g id="symbol">
+    <!-- A writing cursor marks the next sentence; the line beside it becomes the plot arc. -->
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84"
+      fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>

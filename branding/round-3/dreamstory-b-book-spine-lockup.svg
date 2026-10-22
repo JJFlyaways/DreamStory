@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Book Spine lockup exploration</title>
+  <g id="symbol">
+    <path fill="#111111" d="M44 28 H200 A28 28 0 0 1 228 56 V200 A28 28 0 0 1 200 228 H44 A28 28 0 0 1 16 200 V56 A28 28 0 0 1 44 28 Z"/>
+    <path d="M78 48 C57 77 57 179 78 208" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M108 82 H192 M108 118 H192 M108 154 H176" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

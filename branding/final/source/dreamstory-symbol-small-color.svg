@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory color small symbol</title>
+
+    <g id="symbol">
+      <path fill="#10232B" d="M50 28H206A22 22 0 0 1 228 50V206A22 22 0 0 1 206 228H50A22 22 0 0 1 28 206V50A22 22 0 0 1 50 28Z"/>
+      <path fill="#18333D" d="M28 28H62V228H28Z"/>
+      <path fill="#F7F5EE" d="M82 56H196V200H82Z"/>
+      <path fill="#6BC8C1" d="M104 108C104 88 115 76 133 76V96C123 96 118 102 118 113V130H104Z"/>
+      <path fill="#6BC8C1" d="M145 108C145 88 156 76 174 76V96C164 96 159 102 159 113V130H145Z"/>
+    </g>
+
+</svg>
