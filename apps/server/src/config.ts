@@ -134,7 +134,14 @@ function parseLogLevel(value: string | undefined): LogLevel {
 }
 
 function parseAllowedOrigins(value: string | undefined, port: number): readonly string[] {
-  const rawOrigins = value === undefined ? [`http://${LOOPBACK_HOST}:${port}`] : value.split(',');
+  const rawOrigins =
+    value === undefined
+      ? [
+          `http://${LOOPBACK_HOST}:${port}`,
+          `http://${LOOPBACK_HOST}:5173`,
+          `http://${LOOPBACK_HOST}:4173`,
+        ]
+      : value.split(',');
   const origins = rawOrigins.map((rawOrigin) => rawOrigin.trim());
 
   if (origins.length === 0 || origins.some((origin) => origin.length === 0)) {

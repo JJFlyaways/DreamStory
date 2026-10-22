@@ -19,7 +19,11 @@ test('uses safe local defaults', () => {
 
   assert.equal(config.listen.host, LOOPBACK_HOST);
   assert.equal(config.listen.port, DEFAULT_PORT);
-  assert.deepEqual(config.listen.allowedOrigins, ['http://127.0.0.1:3000']);
+  assert.deepEqual(config.listen.allowedOrigins, [
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:4173',
+  ]);
   assert.equal(config.session.ttlSeconds, DEFAULT_SESSION_TTL_SECONDS);
   assert.equal(config.dataDirectory, '/home/tester/.local/share/DreamStory');
   assert.equal(config.libraryRoot, '/home/tester/.local/share/DreamStory/library');

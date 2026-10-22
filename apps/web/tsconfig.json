@@ -4,7 +4,11 @@
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "emitDeclarationOnly": true
   },
   "include": ["src"]
 }
