@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type CSSProperties, type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import {
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   ApiError,
@@ -16,6 +23,7 @@ import {
   saveDraft,
   savePlan,
 } from './api';
+import { CodeMirrorEditor } from './CodeMirrorEditor';
 import type { Book, Chapter, DraftVersion, PlanKind, PlanNode } from './types';
 import './styles.css';
 
@@ -656,35 +664,68 @@ function WritingWorkspace({
   const [saveState, setSaveState] = useState<'未保存' | '保存中' | '已保存' | '冲突' | '失败'>(
     '已保存',
   );
+  const loadedChapterRef = useRef<string | null>(null);
+  const draftRevisionRef = useRef(current?.revision ?? 0);
+  const lastSavedContentRef = useRef(current?.content ?? '');
+  const lastSavedCompleteRef = useRef(current?.complete ?? false);
   const saveMutation = useMutation({
     mutationFn: () =>
       saveDraft(book.id, chapter.id, `draft_${newRequestId()}`, {
         clientRequestId: newRequestId(),
-        expectedDraftRevision: current?.revision ?? 0,
+        expectedDraftRevision: draftRevisionRef.current,
         content,
         complete,
       }),
     onMutate: () => setSaveState('保存中'),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      draftRevisionRef.current = result.draftRevision;
+      lastSavedContentRef.current = result.draft.content;
+      lastSavedCompleteRef.current = result.draft.complete;
       setSaveState('已保存');
       await onRefresh();
       await draftsQuery.refetch();
     },
-    onError: (error: unknown) =>
-      setSaveState(error instanceof ApiError && error.status === 409 ? '冲突' : '失败'),
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.status === 409) {
+        const revision = error.payload.details['currentDraftRevision'];
+        if (typeof revision === 'number') {
+          draftRevisionRef.current = revision;
+        }
+        setSaveState('冲突');
+      } else {
+        setSaveState('失败');
+      }
+    },
   });
 
   useEffect(() => {
-    if (current !== null) {
-      setContent(current.content);
-      setComplete(current.complete);
-      setSaveState('已保存');
+    if (draftsQuery.isPending || loadedChapterRef.current === chapter.id) {
+      return;
     }
-  }, [current?.id]);
+    loadedChapterRef.current = chapter.id;
+    draftRevisionRef.current = current?.revision ?? 0;
+    lastSavedContentRef.current = current?.content ?? '';
+    lastSavedCompleteRef.current = current?.complete ?? false;
+    setContent(current?.content ?? '');
+    setComplete(current?.complete ?? false);
+    setSaveState('已保存');
+  }, [chapter.id, current?.id, draftsQuery.isPending]);
+
+  useEffect(() => {
+    if (loadedChapterRef.current !== chapter.id || saveMutation.isPending) {
+      return;
+    }
+    if (content === lastSavedContentRef.current && complete === lastSavedCompleteRef.current) {
+      return;
+    }
+    setSaveState('未保存');
+    const timer = window.setTimeout(() => saveMutation.mutate(), 900);
+    return () => window.clearTimeout(timer);
+  }, [chapter.id, complete, content, saveMutation.isPending]);
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
-      if (saveState === '未保存' || saveState === '保存中') {
+      if (saveState !== '已保存') {
         event.preventDefault();
       }
     };
@@ -696,9 +737,14 @@ function WritingWorkspace({
     mutationFn: (sourceDraftId: string) =>
       restoreDraft(book.id, chapter.id, sourceDraftId, {
         clientRequestId: newRequestId(),
-        expectedDraftRevision: current?.revision ?? 0,
+        expectedDraftRevision: draftRevisionRef.current,
       }),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      draftRevisionRef.current = result.draftRevision;
+      lastSavedContentRef.current = result.draft.content;
+      lastSavedCompleteRef.current = result.draft.complete;
+      setContent(result.draft.content);
+      setComplete(result.draft.complete);
       await draftsQuery.refetch();
       setSaveState('已保存');
     },
@@ -719,15 +765,7 @@ function WritingWorkspace({
           </div>
         </div>
         <div className="editor-placeholder">
-          <textarea
-            value={content}
-            onChange={(event) => {
-              setContent(event.target.value);
-              setSaveState('未保存');
-            }}
-            placeholder="从一个动作开始。让这一章先拥有自己的呼吸。"
-            aria-label="正文编辑器"
-          />
+          <CodeMirrorEditor value={content} onChange={setContent} ariaLabel="正文编辑器" />
           <div className="editor-footer">
             <label className="check-label">
               <input

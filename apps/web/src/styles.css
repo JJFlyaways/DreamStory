@@ -587,6 +587,30 @@ select {
   background: rgba(255, 255, 255, 0.32);
   border-top: 2px solid var(--ink);
 }
+.codemirror-editor .cm-editor {
+  min-height: 420px;
+  color: #273b40;
+  background: transparent;
+  font:
+    19px/2.05 Georgia,
+    'Songti SC',
+    serif;
+}
+.codemirror-editor .cm-scroller {
+  min-height: 420px;
+  overflow: auto;
+}
+.codemirror-editor .cm-content {
+  min-height: 364px;
+  padding: 28px 26px;
+  caret-color: var(--teal-deep);
+}
+.codemirror-editor .cm-gutters {
+  display: none;
+}
+.codemirror-editor .cm-editor.cm-focused {
+  outline: none;
+}
 .editor-placeholder textarea {
   min-height: 420px;
   padding: 28px 26px;
