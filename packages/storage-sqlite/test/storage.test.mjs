@@ -156,13 +156,22 @@ test('initializes the operational schema and provides repository adapters', asyn
       now: new Date('2026-10-20T12:34:56.789Z'),
     });
 
-    assert.equal(initialized.migration.currentVersion, 2);
+    assert.equal(initialized.migration.currentVersion, 3);
     assert.deepEqual(
       initialized.connection.db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .pluck()
         .all(),
-      ['books', 'command_receipts', 'outbox_jobs', 'runs'],
+      [
+        'books',
+        'chapters',
+        'command_receipts',
+        'draft_versions',
+        'outbox_jobs',
+        'plan_node_versions',
+        'plan_nodes',
+        'runs',
+      ],
     );
 
     const createdAt = '2026-10-20T12:34:56.000Z';
@@ -279,6 +288,115 @@ test('initializes the operational schema and provides repository adapters', asyn
     const persisted = await reopened.repositories.books.get('book_02');
     assert.equal(persisted.bookRevision, 2);
     assert.equal(persisted.title === '并发更新 A' || persisted.title === '并发更新 B', true);
+
+    const writingService = new BookService(
+      reopened.repositories.books,
+      reopened.repositories.commandReceipts,
+    );
+    const writingBook = await writingService.createBook({
+      bookId: 'book_03',
+      clientRequestId: 'a57d7460-1b24-4b19-91c9-879fa8f28e4f',
+      title: '规划测试书',
+      language: 'zh-CN',
+      genre: '悬疑',
+      premise: '验证规划、章节和草稿版本。',
+      createdAt,
+    });
+    const rootPlan = {
+      id: 'plan_book_03',
+      bookId: writingBook.book.id,
+      parentId: null,
+      kind: 'book',
+      sortKey: '0001',
+      content: {
+        title: '规划测试书',
+        goal: '建立完整故事方向',
+        conflict: '主角必须面对过去',
+        startState: '主角仍在逃避',
+        endState: '主角决定调查真相',
+        requiredBeats: ['收到线索'],
+        avoid: ['提前揭示真相'],
+      },
+      status: 'confirmed',
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const savedRoot = await reopened.repositories.plans.save(rootPlan, 1);
+    assert.equal(savedRoot.bookRevision, 2);
+    assert.equal(savedRoot.node.version, 1);
+    const savedRootAgain = await reopened.repositories.plans.save(
+      { ...rootPlan, content: { ...rootPlan.content, goal: '建立可执行故事方向' } },
+      2,
+    );
+    assert.equal(savedRootAgain.bookRevision, 3);
+    assert.equal((await reopened.repositories.plans.history('book_03', 'plan_book_03')).length, 2);
+
+    const chapterPlan = await reopened.repositories.plans.save(
+      {
+        id: 'plan_chapter_01',
+        bookId: 'book_03',
+        parentId: 'plan_book_03',
+        kind: 'chapter',
+        sortKey: '0001',
+        content: {
+          title: '第一章：旧信',
+          goal: '让主角收到关键线索',
+          conflict: '主角不相信寄件人仍然活着',
+          startState: '主角认为母亲已经失踪十年',
+          endState: '主角决定追查邮戳',
+          requiredBeats: ['收到旧信'],
+          avoid: ['揭示寄件人身份'],
+        },
+        status: 'confirmed',
+        createdAt,
+        updatedAt: createdAt,
+      },
+      3,
+    );
+    assert.equal(chapterPlan.bookRevision, 4);
+    const chapter = await reopened.repositories.chapters.create(
+      {
+        id: 'chapter_01',
+        bookId: 'book_03',
+        chapterNumber: 1,
+        displayTitle: '第一章：旧信',
+        planNodeId: 'plan_chapter_01',
+        currentDraftId: null,
+        currentFinalizationId: null,
+        createdAt,
+        updatedAt: createdAt,
+      },
+      4,
+    );
+    assert.equal(chapter.bookRevision, 5);
+    const firstDraft = await reopened.repositories.drafts.save(
+      {
+        id: 'draft_01',
+        chapterId: 'chapter_01',
+        content: '雨停时，信才送到她手上。',
+        complete: false,
+        sourceRunId: null,
+        createdBy: 'author',
+        createdAt,
+      },
+      0,
+    );
+    assert.equal(firstDraft.draft.revision, 1);
+    const secondDraft = await reopened.repositories.drafts.save(
+      {
+        id: 'draft_02',
+        chapterId: 'chapter_01',
+        content: '雨停时，信才送到她手上。她看见了旧邮戳。',
+        complete: true,
+        sourceRunId: null,
+        createdBy: 'author',
+        createdAt: '2026-10-20T12:36:00.000Z',
+      },
+      1,
+    );
+    assert.equal(secondDraft.draft.revision, 2);
+    assert.equal((await reopened.repositories.drafts.current('chapter_01')).id, 'draft_02');
+    assert.equal((await reopened.repositories.drafts.list('chapter_01')).length, 2);
     reopened.connection.close();
   } finally {
     await removeTestDirectory(directory);

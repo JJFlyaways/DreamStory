@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 
 export const runIntents = [
   'plan_book',
@@ -22,6 +22,9 @@ export const runStatuses = [
 ] as const;
 
 export const outboxJobStatuses = ['pending', 'processing', 'completed', 'failed'] as const;
+export const planNodeKinds = ['book', 'volume', 'arc', 'chapter'] as const;
+export const planNodeStatuses = ['confirmed', 'superseded'] as const;
+export const draftCreatedByValues = ['author', 'restore', 'import', 'agent'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -31,11 +34,90 @@ export const books = sqliteTable(
     language: text('language').notNull(),
     genre: text('genre').notNull(),
     premise: text('premise').notNull(),
+    conventionsJson: text('conventions_json').notNull().default('{}'),
     bookRevision: integer('book_revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [index('books_updated_at_idx').on(table.updatedAt)],
+);
+
+export const planNodes = sqliteTable(
+  'plan_nodes',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    parentId: text('parent_id'),
+    kind: text('kind', { enum: planNodeKinds }).notNull(),
+    sortKey: text('sort_key').notNull(),
+    contentJson: text('content_json').notNull(),
+    version: integer('version').notNull().default(1),
+    status: text('status', { enum: planNodeStatuses }).notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('plan_nodes_book_sort_idx').on(table.bookId, table.sortKey, table.id),
+    index('plan_nodes_parent_idx').on(table.bookId, table.parentId, table.sortKey),
+  ],
+);
+
+export const planNodeVersions = sqliteTable(
+  'plan_node_versions',
+  {
+    planId: text('plan_id').notNull(),
+    version: integer('version').notNull(),
+    bookId: text('book_id').notNull(),
+    parentId: text('parent_id'),
+    kind: text('kind', { enum: planNodeKinds }).notNull(),
+    sortKey: text('sort_key').notNull(),
+    contentJson: text('content_json').notNull(),
+    status: text('status', { enum: planNodeStatuses }).notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.planId, table.version] }),
+    index('plan_node_versions_book_plan_idx').on(table.bookId, table.planId, table.version),
+  ],
+);
+
+export const chapters = sqliteTable(
+  'chapters',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    chapterNumber: integer('chapter_number').notNull(),
+    displayTitle: text('display_title').notNull(),
+    planNodeId: text('plan_node_id').notNull(),
+    currentDraftId: text('current_draft_id'),
+    currentFinalizationId: text('current_finalization_id'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    unique('chapters_book_number_unique').on(table.bookId, table.chapterNumber),
+    index('chapters_book_number_idx').on(table.bookId, table.chapterNumber),
+  ],
+);
+
+export const draftVersions = sqliteTable(
+  'draft_versions',
+  {
+    id: text('id').primaryKey(),
+    chapterId: text('chapter_id').notNull(),
+    parentId: text('parent_id'),
+    revision: integer('revision').notNull(),
+    content: text('content').notNull(),
+    complete: integer('complete', { mode: 'boolean' }).notNull(),
+    sourceRunId: text('source_run_id'),
+    createdBy: text('created_by', { enum: draftCreatedByValues }).notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    unique('draft_versions_chapter_revision_unique').on(table.chapterId, table.revision),
+    index('draft_versions_chapter_revision_idx').on(table.chapterId, table.revision),
+  ],
 );
 
 export const commandReceipts = sqliteTable(
@@ -86,6 +168,10 @@ export const runs = sqliteTable(
 
 export const schema = {
   books,
+  planNodes,
+  planNodeVersions,
+  chapters,
+  draftVersions,
   commandReceipts,
   outboxJobs,
   runs,

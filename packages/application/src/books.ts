@@ -22,6 +22,7 @@ export interface CreateBookCommand {
   language: string;
   genre: string;
   premise: string;
+  conventions?: Record<string, unknown>;
   createdAt: IsoUtcDateTime;
 }
 
@@ -77,6 +78,7 @@ export class BookService {
       language: command.language,
       genre: command.genre,
       premise: command.premise,
+      conventions: command.conventions ?? {},
       bookRevision: 1,
       createdAt: command.createdAt,
       updatedAt: command.createdAt,
