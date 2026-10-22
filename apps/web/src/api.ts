@@ -51,6 +51,21 @@ export async function createBook(input: {
   return request<Book>('/books', { method: 'POST', body: input });
 }
 
+export async function updateBook(
+  bookId: string,
+  input: {
+    clientRequestId: string;
+    expectedBookRevision: number;
+    title?: string;
+    language?: string;
+    genre?: string;
+    premise?: string;
+    conventions?: Record<string, unknown>;
+  },
+): Promise<Book> {
+  return request<Book>(`/books/${bookId}`, { method: 'PATCH', body: input });
+}
+
 export async function listPlans(bookId: string): Promise<PlanNode[]> {
   return request<PlanNode[]>(`/books/${bookId}/plans`);
 }
@@ -140,6 +155,34 @@ export async function exportBook(bookId: string, format: 'markdown' | 'txt') {
     contentHash: string;
     updatedAt: string;
   }>(`/books/${bookId}/exports`, { method: 'POST', body: { format } });
+}
+
+export async function createBackup(bookId: string) {
+  return request<{
+    fileName: string;
+    relativePath: string;
+    sizeBytes: number;
+    createdAt: string;
+  }>(`/books/${bookId}/backups`, { method: 'POST' });
+}
+
+export async function downloadExport(bookId: string, format: 'markdown' | 'txt'): Promise<void> {
+  const response = await fetch(`${API_BASE}/books/${bookId}/exports/${format}`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const payload = (await response.json()) as { error: ApiErrorPayload };
+    throw new ApiError(response.status, payload.error);
+  }
+  const blob = new Blob([await response.text()], {
+    type: format === 'markdown' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${bookId}.${format === 'markdown' ? 'md' : 'txt'}`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 async function ensureSession(): Promise<void> {

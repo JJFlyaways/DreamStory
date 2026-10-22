@@ -335,6 +335,22 @@ test('lists books and rebuilds Markdown/TXT exports with consistent backups', as
     assert.equal(create.statusCode, 201);
     const bookId = create.json().data.id;
 
+    const settingsUpdate = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/books/${bookId}`,
+      headers,
+      payload: {
+        clientRequestId: 'd74e7b8e-80f0-4c20-8f9c-b1b82f9a6d5b',
+        expectedBookRevision: 1,
+        conventions: { viewpoint: '第一人称', tone: '克制' },
+      },
+    });
+    assert.equal(settingsUpdate.statusCode, 200);
+    assert.deepEqual(settingsUpdate.json().data.conventions, {
+      viewpoint: '第一人称',
+      tone: '克制',
+    });
+
     const shelf = await app.inject({ method: 'GET', url: '/api/v1/books' });
     assert.equal(shelf.statusCode, 200);
     assert.equal(shelf.json().data.length, 1);

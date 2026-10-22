@@ -10,9 +10,10 @@ import {
 
 import {
   ApiError,
+  createBackup,
   createBook,
   createChapter,
-  exportBook,
+  downloadExport,
   getBook,
   listBooks,
   listChapters,
@@ -22,6 +23,7 @@ import {
   restoreDraft,
   saveDraft,
   savePlan,
+  updateBook,
 } from './api';
 import { CodeMirrorEditor } from './CodeMirrorEditor';
 import type { Book, Chapter, DraftVersion, PlanKind, PlanNode } from './types';
@@ -108,6 +110,8 @@ function BookWorkspace({
   const queryClient = useQueryClient();
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [showCreateBook, setShowCreateBook] = useState(false);
+  const [bookFilter, setBookFilter] = useState('');
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
   const bookQuery = useQuery({ queryKey: ['book', bookId], queryFn: () => getBook(bookId) });
   const plansQuery = useQuery({ queryKey: ['plans', bookId], queryFn: () => listPlans(bookId) });
   const chaptersQuery = useQuery({
@@ -118,6 +122,10 @@ function BookWorkspace({
   const book = bookQuery.data;
   const plans = plansQuery.data ?? [];
   const chapters = chaptersQuery.data ?? [];
+  const visibleBooks = books.filter((item) => {
+    const needle = bookFilter.trim().toLocaleLowerCase();
+    return needle === '' || `${item.title} ${item.genre}`.toLocaleLowerCase().includes(needle);
+  });
   const selectedChapter = chapters.find((chapter) => chapter.id === selectedChapterId) ?? null;
 
   useEffect(() => {
@@ -156,8 +164,15 @@ function BookWorkspace({
             ＋
           </button>
         </div>
+        <input
+          className="rail-search"
+          value={bookFilter}
+          onChange={(event) => setBookFilter(event.target.value)}
+          placeholder="搜索作品"
+          aria-label="搜索作品"
+        />
         <div className="book-list">
-          {books.map((item) => (
+          {visibleBooks.map((item) => (
             <button
               className={`book-list-item ${item.id === bookId ? 'is-active' : ''}`}
               key={item.id}
@@ -205,14 +220,52 @@ function BookWorkspace({
             <h1>{book.title}</h1>
           </div>
           <div className="stage-actions">
-            <button className="quiet-button" onClick={() => void exportBook(book.id, 'markdown')}>
+            <button
+              className="quiet-button"
+              onClick={() => {
+                setActionStatus('正在准备 Markdown…');
+                void downloadExport(book.id, 'markdown')
+                  .then(() => setActionStatus('Markdown 已下载'))
+                  .catch((error: unknown) =>
+                    setActionStatus(error instanceof Error ? error.message : '导出失败'),
+                  );
+              }}
+            >
               导出 Markdown
             </button>
-            <button className="quiet-button" onClick={() => void exportBook(book.id, 'txt')}>
+            <button
+              className="quiet-button"
+              onClick={() => {
+                setActionStatus('正在准备 TXT…');
+                void downloadExport(book.id, 'txt')
+                  .then(() => setActionStatus('TXT 已下载'))
+                  .catch((error: unknown) =>
+                    setActionStatus(error instanceof Error ? error.message : '导出失败'),
+                  );
+              }}
+            >
               导出 TXT
+            </button>
+            <button
+              className="quiet-button"
+              onClick={() => {
+                setActionStatus('正在创建备份…');
+                void createBackup(book.id)
+                  .then((result) => setActionStatus(`备份已保存 · ${result.relativePath}`))
+                  .catch((error: unknown) =>
+                    setActionStatus(error instanceof Error ? error.message : '备份失败'),
+                  );
+              }}
+            >
+              备份
             </button>
           </div>
         </div>
+        {actionStatus && (
+          <p className="action-status" role="status">
+            {actionStatus}
+          </p>
+        )}
 
         {selectedChapter === null ? (
           <Overview
@@ -249,20 +302,7 @@ function BookWorkspace({
             <strong>{book.genre || '未定'}</strong>
           </div>
         </section>
-        <section className="right-section right-note">
-          <p className="eyebrow">创作约定</p>
-          <p>{book.premise || '还没有写下故事的第一句话。'}</p>
-          {Object.entries(book.conventions).length > 0 && (
-            <dl className="convention-list">
-              {Object.entries(book.conventions).map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{String(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </section>
+        <ConventionsEditor book={book} onSaved={refreshBook} />
         <section className="right-section right-callout">
           <span className="callout-line" />
           <p>先把事实写在这里。模型以后只能提出候选，定稿始终由你决定。</p>
@@ -369,6 +409,107 @@ function Overview({
         />
       </section>
     </div>
+  );
+}
+
+function ConventionsEditor({ book, onSaved }: { book: Book; onSaved: () => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [entries, setEntries] = useState<[string, string][]>(() =>
+    Object.entries(book.conventions).map(([key, value]) => [key, String(value)]),
+  );
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateBook(book.id, {
+        clientRequestId: newRequestId(),
+        expectedBookRevision: book.bookRevision,
+        conventions: Object.fromEntries(
+          entries.filter(([key, value]) => key.trim() !== '' && value.trim() !== ''),
+        ),
+      }),
+    onSuccess: async () => {
+      setEditing(false);
+      await onSaved();
+    },
+  });
+
+  useEffect(() => {
+    if (!editing) {
+      setEntries(Object.entries(book.conventions).map(([key, value]) => [key, String(value)]));
+    }
+  }, [book.bookRevision, editing]);
+
+  return (
+    <section className="right-section right-note">
+      <div className="section-heading compact-heading">
+        <div>
+          <p className="eyebrow">设定台</p>
+          <h3>角色与世界设定</h3>
+        </div>
+        <button className="text-button" onClick={() => setEditing((value) => !value)}>
+          {editing ? '收起' : '编辑'}
+        </button>
+      </div>
+      <p>{book.premise || '还没有写下故事的第一句话。'}</p>
+      {!editing && Object.entries(book.conventions).length === 0 && (
+        <p className="muted-copy">把视角、人物身份、世界规则写成几条短句，后续每一步都能回看。</p>
+      )}
+      {!editing && Object.entries(book.conventions).length > 0 && (
+        <dl className="convention-list">
+          {Object.entries(book.conventions).map(([key, value]) => (
+            <div key={key}>
+              <dt>{key}</dt>
+              <dd>{String(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {editing && (
+        <div className="convention-editor">
+          {entries.map(([key, value], index) => (
+            <div className="convention-edit-row" key={`${index}-${key}`}>
+              <input
+                value={key}
+                onChange={(event) => {
+                  const next = [...entries];
+                  next[index] = [event.target.value, value];
+                  setEntries(next);
+                }}
+                placeholder="设定名"
+                aria-label="设定名"
+              />
+              <input
+                value={value}
+                onChange={(event) => {
+                  const next = [...entries];
+                  next[index] = [key, event.target.value];
+                  setEntries(next);
+                }}
+                placeholder="设定内容"
+                aria-label="设定内容"
+              />
+              <button
+                className="icon-button"
+                onClick={() => setEntries(entries.filter((_, itemIndex) => itemIndex !== index))}
+                aria-label="删除这条设定"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button className="inline-action" onClick={() => setEntries([...entries, ['', '']])}>
+            ＋ 添加设定
+          </button>
+          {mutation.error && <InlineError error={mutation.error} />}
+          <button
+            className="primary-button"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            保存设定
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
