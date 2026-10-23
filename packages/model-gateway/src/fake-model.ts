@@ -1,6 +1,8 @@
+import type { ModelProvider, ModelTextRequest } from './provider.js';
+
 export type FakeCallStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
-export type FakeModelErrorCode = 'MODEL_FAILURE' | 'CANCELLED';
+export type FakeModelErrorCode = 'MODEL_FAILURE' | 'CANCELLED' | 'INVALID_RESPONSE';
 
 export interface FakeModelUsage {
   inputTokens: number;
@@ -8,11 +10,7 @@ export interface FakeModelUsage {
   usageKind: 'reported' | 'estimated' | 'unknown';
 }
 
-export interface FakeTextRequest {
-  input: string;
-  requestId?: string;
-  signal?: AbortSignal;
-}
+export type FakeTextRequest = ModelTextRequest;
 
 export interface FakeTextChunk {
   callId: string;
@@ -71,7 +69,9 @@ interface StoredFakeModelCall {
   error?: string;
 }
 
-export class FakeModelProvider {
+export class FakeModelProvider implements ModelProvider {
+  readonly capabilities = ['stream_text', 'structured_output', 'cancel', 'usage'] as const;
+
   private readonly chunks: readonly string[];
 
   private readonly delayMs: number;
@@ -180,6 +180,27 @@ export class FakeModelProvider {
       text: chunks.join(''),
       usage: { ...call.usage },
     };
+  }
+
+  async generateStructured<T>(request: FakeTextRequest & { schema?: unknown }): Promise<{
+    callId: string;
+    value: T;
+    usage: FakeModelUsage;
+  }> {
+    const result = await this.generateText(request);
+    try {
+      return {
+        callId: result.callId,
+        value: JSON.parse(result.text) as T,
+        usage: result.usage,
+      };
+    } catch (error) {
+      throw new FakeModelError(
+        'INVALID_RESPONSE',
+        result.callId,
+        `Fake model returned invalid JSON: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
   }
 
   cancel(callId: string): boolean {
