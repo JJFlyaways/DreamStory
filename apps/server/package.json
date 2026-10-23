@@ -7,6 +7,7 @@
     "@dreamstory/application": "workspace:*",
     "@dreamstory/contracts": "workspace:*",
     "@dreamstory/storage-sqlite": "workspace:*",
+    "@dreamstory/story-context": "workspace:*",
     "fastify": "5.12.7"
   },
   "devDependencies": {

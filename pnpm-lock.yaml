@@ -234,6 +234,9 @@ importers:
       '@dreamstory/storage-sqlite':
         specifier: workspace:*
         version: link:../../packages/storage-sqlite
+      '@dreamstory/story-context':
+        specifier: workspace:*
+        version: link:../../packages/story-context
       fastify:
         specifier: 5.12.7
         version: 5.12.7
@@ -318,7 +321,18 @@ importers:
         specifier: 26.6.5
         version: 26.6.5
 
-  packages/story-context: {}
+  packages/story-context:
+    dependencies:
+      '@dreamstory/application':
+        specifier: workspace:*
+        version: link:../application
+      '@dreamstory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
 
 packages:
   '@cacheable/memory@2.2.0':

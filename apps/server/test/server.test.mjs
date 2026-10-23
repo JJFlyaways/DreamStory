@@ -225,6 +225,22 @@ test('manages plan hierarchy, chapters, draft versions, conflicts, and restore',
     assert.equal(history.statusCode, 200);
     assert.equal(history.json().data.length, 1);
 
+    const contextPreview = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/context/preview`,
+      payload: {
+        intent: 'draft_chapter',
+        target: { planId: 'plan_chapter_01', chapterNumber: 1 },
+        modelProfileId: 'writer_primary',
+        expectedBookRevision: 5,
+        maxInputTokens: 2_000,
+      },
+    });
+    assert.equal(contextPreview.statusCode, 200);
+    assert.equal(contextPreview.json().data.role, 'writer');
+    assert.match(contextPreview.json().data.sourceFingerprint, /^sha256:[0-9a-f]{64}$/);
+    assert.match(contextPreview.json().data.contextText, /第一章：旧信/);
+
     const chapter = await app.inject({
       method: 'POST',
       url: `/api/v1/books/${bookId}/chapters`,

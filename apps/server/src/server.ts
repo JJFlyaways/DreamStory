@@ -41,6 +41,11 @@ import {
   type InitializedProjectDatabase,
   type ProjectDatabaseProbe,
 } from '@dreamstory/storage-sqlite';
+import {
+  buildChapterContext,
+  type AgentRole,
+  type ContextPreview,
+} from '@dreamstory/story-context';
 
 import { parseServerConfig } from './config.js';
 import { SESSION_COOKIE_NAME, SessionManager } from './session.js';
@@ -75,6 +80,14 @@ export interface ExportResult {
   characterCount: number;
   contentHash: string;
   updatedAt: string;
+}
+
+export interface ContextPreviewCommand {
+  role: AgentRole;
+  targetPlanId: StableId;
+  targetChapterNumber?: number;
+  modelProfileId: string;
+  maxInputTokens: number;
 }
 
 export class BookProjectManager {
@@ -294,6 +307,36 @@ export class BookProjectManager {
     };
   }
 
+  async previewContext(bookId: StableId, command: ContextPreviewCommand): Promise<ContextPreview> {
+    const initialized = await this.openBook(bookId);
+    const book = await initialized.repositories.books.get(bookId);
+    if (book === null) {
+      throw new BookCommandError('NOT_FOUND', 'The book does not exist.');
+    }
+    const plans = await initialized.repositories.plans.list(bookId);
+    const chapters = await initialized.repositories.chapters.list(bookId);
+    const draftsByChapter = new Map();
+    for (const chapter of chapters) {
+      draftsByChapter.set(chapter.id, await initialized.repositories.drafts.current(chapter.id));
+    }
+    if (book.bookRevision < 1) {
+      throw new Error('The book revision is invalid.');
+    }
+    return buildChapterContext({
+      book,
+      plans,
+      chapters,
+      draftsByChapter,
+      targetPlanId: command.targetPlanId,
+      ...(command.targetChapterNumber === undefined
+        ? {}
+        : { targetChapterNumber: command.targetChapterNumber }),
+      role: command.role,
+      modelProfileId: command.modelProfileId,
+      maxInputTokens: command.maxInputTokens,
+    });
+  }
+
   async readExport(bookId: StableId, format: ExportFormat): Promise<string> {
     const fileName = `${bookId}.${format === 'markdown' ? 'md' : 'txt'}`;
     try {
@@ -393,6 +436,37 @@ export function createServer(
     reply.header('set-cookie', serializeSessionCookie(issued.cookie));
     return { data: issued.session };
   });
+
+  app.post<{ Params: { bookId: string } }>(
+    '/api/v1/books/:bookId/context/preview',
+    async (request, reply) => {
+      try {
+        const bookId = parseBookId(request.params.bookId);
+        const body = parseContextPreviewBody(request.body);
+        const book = await projectManager.getBook(bookId);
+        if (book === null) {
+          return sendError(reply, request, 404, 'NOT_FOUND', 'The book does not exist.');
+        }
+        if (book.bookRevision !== body.expectedBookRevision) {
+          return sendError(
+            reply,
+            request,
+            409,
+            'REVISION_CONFLICT',
+            'The book revision has changed.',
+            {
+              expectedBookRevision: body.expectedBookRevision,
+              currentBookRevision: book.bookRevision,
+            },
+          );
+        }
+        const result = await projectManager.previewContext(bookId, body.command);
+        return { data: result };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
 
   app.get('/api/v1/books', async (_request, reply) => {
     try {
@@ -897,6 +971,47 @@ function parseExportFormat(value: unknown): ExportFormat {
     return value;
   }
   throw new Error('format must be markdown or txt.');
+}
+
+function parseContextPreviewBody(value: unknown): {
+  expectedBookRevision: BookRevision;
+  command: ContextPreviewCommand;
+} {
+  const record = asRecord(value);
+  const target = asRecord(record['target']);
+  const intent = requiredString(record['intent']);
+  const role = intent.startsWith('plan_')
+    ? 'planner'
+    : intent === 'review_chapter'
+      ? 'reviewer'
+      : 'writer';
+  const targetPlanIdValue = target['planId'] ?? target['planNodeId'];
+  if (targetPlanIdValue === undefined) {
+    throw new Error('target.planId is required for context preview.');
+  }
+  const targetChapterNumber = target['chapterNumber'];
+  if (
+    targetChapterNumber !== undefined &&
+    (typeof targetChapterNumber !== 'number' || !Number.isSafeInteger(targetChapterNumber))
+  ) {
+    throw new Error('target.chapterNumber must be an integer.');
+  }
+  return {
+    expectedBookRevision: parsePositiveInteger(
+      record['expectedBookRevision'],
+      'expectedBookRevision',
+    ),
+    command: {
+      role,
+      targetPlanId: parseStableId(requiredString(targetPlanIdValue)),
+      ...(targetChapterNumber === undefined ? {} : { targetChapterNumber }),
+      modelProfileId: requiredString(record['modelProfileId']),
+      maxInputTokens:
+        record['maxInputTokens'] === undefined
+          ? 12_000
+          : parsePositiveInteger(record['maxInputTokens'], 'maxInputTokens'),
+    },
+  };
 }
 
 function parsePlanContent(value: unknown): PlanContent {
