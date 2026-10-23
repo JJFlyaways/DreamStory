@@ -105,7 +105,7 @@ test('creates, reopens, idempotently retries, and protects book revisions', asyn
     assert.deepEqual(health.json().data.database, {
       available: true,
       status: 'ready',
-      schemaVersion: 4,
+      schemaVersion: 6,
     });
 
     const updates = await Promise.all([

@@ -5,6 +5,9 @@ import type {
   DraftVersion,
   PlanNode,
   PlanSaveResult,
+  ModelProfile,
+  RunArtifact,
+  RunRecord,
   ShelfEntry,
 } from './types';
 
@@ -100,6 +103,54 @@ export async function getChapter(bookId: string, chapterId: string): Promise<Cha
   return request<Chapter>(`/books/${bookId}/chapters/${chapterId}`);
 }
 
+export async function listModelProfiles(): Promise<ModelProfile[]> {
+  return request<ModelProfile[]>('/model-profiles');
+}
+
+export async function startRun(
+  bookId: string,
+  input: {
+    intent: string;
+    expectedBookRevision: number;
+    target: { planId: string; chapterNumber: number };
+    modelProfileId: string;
+    scope: { chapterNumbers: number[] };
+  },
+): Promise<RunRecord> {
+  return request<RunRecord>(`/books/${bookId}/runs`, { method: 'POST', body: input });
+}
+
+export async function getRun(bookId: string, runId: string): Promise<RunRecord> {
+  return request<RunRecord>(`/books/${bookId}/runs/${runId}`);
+}
+
+export async function listRunArtifacts(bookId: string, runId: string): Promise<RunArtifact[]> {
+  return request<RunArtifact[]>(`/books/${bookId}/runs/${runId}/artifacts`);
+}
+
+export async function cancelRun(bookId: string, runId: string): Promise<{ cancelled: boolean }> {
+  return request<{ cancelled: boolean }>(`/books/${bookId}/runs/${runId}/cancel`, {
+    method: 'POST',
+  });
+}
+
+export async function finalizeChapter(
+  bookId: string,
+  chapterId: string,
+  input: {
+    clientRequestId: string;
+    expectedBookRevision: number;
+    expectedDraftRevision: number;
+    draftVersionId: string;
+    contentHash: string;
+  },
+): Promise<{ finalization: unknown; bookRevision: number; replayed: boolean }> {
+  return request(`/books/${bookId}/chapters/${chapterId}/finalizations`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
 export async function createChapter(
   bookId: string,
   input: {
@@ -183,6 +234,14 @@ export async function downloadExport(bookId: string, format: 'markdown' | 'txt')
   link.download = `${bookId}.${format === 'markdown' ? 'md' : 'txt'}`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+export async function hashContent(content: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(content),
+  );
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
 async function ensureSession(): Promise<void> {

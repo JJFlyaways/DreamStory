@@ -469,6 +469,20 @@ export function createServer(
     return { data: issued.session };
   });
 
+  app.get('/api/v1/model-profiles', async () => ({
+    data: config.modelProfiles.map((profile) => ({
+      id: profile.id,
+      protocol: profile.protocol,
+      model: profile.model,
+      capabilities: profile.capabilities,
+      purposes: profile.purposes,
+      credentialStatus:
+        profile.credentialRef === undefined || process.env[profile.credentialRef.name]
+          ? 'configured'
+          : 'missing',
+    })),
+  }));
+
   app.post<{ Params: { bookId: string } }>('/api/v1/books/:bookId/runs', async (request, reply) => {
     if (!requireWriteSecurity(request, reply, sessions)) return;
     try {

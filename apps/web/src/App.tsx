@@ -10,23 +10,39 @@ import {
 
 import {
   ApiError,
+  cancelRun,
   createBackup,
   createBook,
   createChapter,
   downloadExport,
+  finalizeChapter,
   getBook,
+  getRun,
+  hashContent,
   listBooks,
   listChapters,
   listDrafts,
+  listModelProfiles,
   listPlans,
+  listRunArtifacts,
   newRequestId,
   restoreDraft,
   saveDraft,
   savePlan,
+  startRun,
   updateBook,
 } from './api';
 import { CodeMirrorEditor } from './CodeMirrorEditor';
-import type { Book, Chapter, DraftVersion, PlanKind, PlanNode } from './types';
+import type {
+  Book,
+  Chapter,
+  DraftVersion,
+  ModelProfile,
+  PlanKind,
+  PlanNode,
+  RunArtifact,
+  RunRecord,
+} from './types';
 import './styles.css';
 
 const planLabels: Record<PlanKind, string> = {
@@ -893,6 +909,83 @@ function WritingWorkspace({
     onError: () => setSaveState('失败'),
   });
 
+  const profilesQuery = useQuery({ queryKey: ['model-profiles'], queryFn: listModelProfiles });
+  const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [runId, setRunId] = useState<string | null>(null);
+  const profiles = profilesQuery.data ?? [];
+  useEffect(() => {
+    if (selectedProfileId === '' && profiles[0] !== undefined) {
+      setSelectedProfileId(profiles[0].id);
+    }
+  }, [profiles, selectedProfileId]);
+  const runQuery = useQuery({
+    queryKey: ['run', book.id, runId],
+    queryFn: () => getRun(book.id, runId as string),
+    enabled: runId !== null,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'queued' || query.state.data?.status === 'running'
+        ? 1_000
+        : false,
+  });
+  const artifactsQuery = useQuery({
+    queryKey: ['run-artifacts', book.id, runId],
+    queryFn: () => listRunArtifacts(book.id, runId as string),
+    enabled: runId !== null && runQuery.data?.status === 'awaiting_author',
+  });
+  const startRunMutation = useMutation({
+    mutationFn: () =>
+      startRun(book.id, {
+        intent: 'draft_chapter',
+        expectedBookRevision: book.bookRevision,
+        target: { planId: chapter.planNodeId, chapterNumber: chapter.chapterNumber },
+        modelProfileId: selectedProfileId,
+        scope: { chapterNumbers: [chapter.chapterNumber] },
+      }),
+    onSuccess: (run) => setRunId(run.id),
+  });
+  const cancelRunMutation = useMutation({
+    mutationFn: () => cancelRun(book.id, runId as string),
+    onSuccess: () => void runQuery.refetch(),
+  });
+  const candidate =
+    artifactsQuery.data?.find((artifact) => artifact.complete) ?? artifactsQuery.data?.[0] ?? null;
+  const applyCandidateMutation = useMutation({
+    mutationFn: () => {
+      if (candidate === null) throw new Error('当前没有可复制的候选正文。');
+      return saveDraft(book.id, chapter.id, `draft_${newRequestId()}`, {
+        clientRequestId: newRequestId(),
+        expectedDraftRevision: draftRevisionRef.current,
+        content: candidate.content,
+        complete: candidate.complete,
+      });
+    },
+    onSuccess: async (result) => {
+      draftRevisionRef.current = result.draftRevision;
+      lastSavedContentRef.current = result.draft.content;
+      lastSavedCompleteRef.current = result.draft.complete;
+      setContent(result.draft.content);
+      setComplete(result.draft.complete);
+      await draftsQuery.refetch();
+      setSaveState('已保存');
+    },
+  });
+  const finalizeMutation = useMutation({
+    mutationFn: async () => {
+      if (current === null || !current.complete) throw new Error('请先保存完整草稿。');
+      return finalizeChapter(book.id, chapter.id, {
+        clientRequestId: newRequestId(),
+        expectedBookRevision: book.bookRevision,
+        expectedDraftRevision: current.revision,
+        draftVersionId: current.id,
+        contentHash: await hashContent(current.content),
+      });
+    },
+    onSuccess: async () => {
+      await onRefresh();
+      await draftsQuery.refetch();
+    },
+  });
+
   return (
     <div className="writing-layout">
       <section className="editor-column">
@@ -944,6 +1037,23 @@ function WritingWorkspace({
         )}
       </section>
       <aside className="writing-context">
+        <RunPanel
+          profiles={profiles}
+          selectedProfileId={selectedProfileId}
+          onSelectProfile={setSelectedProfileId}
+          run={runQuery.data ?? null}
+          artifacts={artifactsQuery.data ?? []}
+          candidate={candidate}
+          onStart={() => startRunMutation.mutate()}
+          onCancel={() => cancelRunMutation.mutate()}
+          onApplyCandidate={() => applyCandidateMutation.mutate()}
+          onFinalize={() => finalizeMutation.mutate()}
+          isStarting={startRunMutation.isPending}
+          isCancelling={cancelRunMutation.isPending}
+          isApplying={applyCandidateMutation.isPending}
+          isFinalizing={finalizeMutation.isPending}
+          error={startRunMutation.error ?? applyCandidateMutation.error ?? finalizeMutation.error}
+        />
         <p className="eyebrow">本章航线</p>
         {plan ? (
           <>
@@ -971,6 +1081,112 @@ function WritingWorkspace({
         <div className="context-footnote">当前是手工编辑模式。模型连接不影响本地保存。</div>
       </aside>
     </div>
+  );
+}
+
+function RunPanel({
+  profiles,
+  selectedProfileId,
+  onSelectProfile,
+  run,
+  artifacts,
+  candidate,
+  onStart,
+  onCancel,
+  onApplyCandidate,
+  onFinalize,
+  isStarting,
+  isCancelling,
+  isApplying,
+  isFinalizing,
+  error,
+}: {
+  profiles: ModelProfile[];
+  selectedProfileId: string;
+  onSelectProfile: (value: string) => void;
+  run: RunRecord | null;
+  artifacts: RunArtifact[];
+  candidate: RunArtifact | null;
+  onStart: () => void;
+  onCancel: () => void;
+  onApplyCandidate: () => void;
+  onFinalize: () => void;
+  isStarting: boolean;
+  isCancelling: boolean;
+  isApplying: boolean;
+  isFinalizing: boolean;
+  error: unknown;
+}) {
+  const active = run?.status === 'queued' || run?.status === 'running';
+  return (
+    <section className="run-panel">
+      <div className="run-panel-heading">
+        <div>
+          <p className="eyebrow">运行航线</p>
+          <h3>候选正文</h3>
+        </div>
+        {run && <span className={`run-state run-state-${run.status}`}>{run.status}</span>}
+      </div>
+      {profiles.length === 0 ? (
+        <p className="muted-copy">尚未配置模型档案。先在服务环境中配置一个 fake 或真实档案。</p>
+      ) : (
+        <label className="run-profile-label">
+          模型档案
+          <select
+            value={selectedProfileId}
+            onChange={(event) => onSelectProfile(event.target.value)}
+            disabled={active}
+          >
+            {profiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.id} · {profile.protocol}
+                {profile.credentialStatus === 'missing' ? '（缺少凭据）' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="run-actions">
+        {!active && (
+          <button
+            className="primary-button"
+            onClick={onStart}
+            disabled={isStarting || profiles.length === 0 || selectedProfileId === ''}
+          >
+            {isStarting ? '正在排队…' : '生成本章候选'}
+          </button>
+        )}
+        {active && (
+          <button className="quiet-button" onClick={onCancel} disabled={isCancelling}>
+            {isCancelling ? '正在取消…' : '取消运行'}
+          </button>
+        )}
+      </div>
+      {run && (
+        <p className="run-detail">
+          运行 {run.id} · 已尝试 {run.attempt} 次
+        </p>
+      )}
+      {run?.status === 'awaiting_author' && candidate && (
+        <div className="candidate-box">
+          <div className="candidate-meta">
+            <span>候选版本 {candidate.revision}</span>
+            <span>{candidate.complete ? '完整' : '部分'}</span>
+          </div>
+          <pre>{candidate.content}</pre>
+          <div className="run-actions">
+            <button className="quiet-button" onClick={onApplyCandidate} disabled={isApplying}>
+              {isApplying ? '正在复制…' : '复制为草稿'}
+            </button>
+            <button className="primary-button" onClick={onFinalize} disabled={isFinalizing}>
+              {isFinalizing ? '正在定稿…' : '定稿当前草稿'}
+            </button>
+          </div>
+        </div>
+      )}
+      {artifacts.length > 0 && <p className="run-detail">已保存 {artifacts.length} 个候选快照</p>}
+      {error !== null && error !== undefined && <InlineError error={error} />}
+    </section>
   );
 }
 

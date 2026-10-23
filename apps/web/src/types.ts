@@ -86,3 +86,46 @@ export interface ApiErrorPayload {
   details: Record<string, unknown>;
   requestId: string;
 }
+
+export type RunStatus =
+  | 'queued'
+  | 'running'
+  | 'awaiting_author'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'stale';
+
+export interface RunRecord {
+  id: string;
+  bookId: string;
+  intent: string;
+  scope: unknown;
+  status: RunStatus;
+  inputSnapshotId: string | null;
+  attempt: number;
+  error: unknown | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RunArtifact {
+  id: string;
+  runId: string;
+  kind: 'proposal' | 'draft_candidate' | 'review' | 'revision_candidate';
+  revision: number;
+  content: string;
+  contentHash: string;
+  complete: boolean;
+  createdAt: string;
+}
+
+export interface ModelProfile {
+  id: string;
+  protocol: string;
+  model: string;
+  capabilities: readonly string[];
+  purposes: readonly string[];
+  credentialStatus: 'configured' | 'missing';
+}

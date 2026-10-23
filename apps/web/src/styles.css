@@ -686,6 +686,86 @@ select {
 .writing-context {
   padding-top: 5px;
 }
+.run-panel {
+  padding: 0 0 20px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--ink);
+}
+.run-panel-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+.run-panel-heading h3 {
+  margin: 0;
+}
+.run-state {
+  color: var(--teal-deep);
+  font-size: 10px;
+}
+.run-state-running,
+.run-state-queued {
+  color: var(--amber);
+}
+.run-state-failed,
+.run-state-cancelled,
+.run-state-stale {
+  color: var(--danger);
+}
+.run-profile-label {
+  display: grid;
+  gap: 6px;
+  color: #697572;
+  font-size: 10px;
+}
+.run-profile-label select {
+  padding: 8px;
+  font-size: 11px;
+}
+.run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.run-actions .primary-button,
+.run-actions .quiet-button {
+  font-size: 11px;
+}
+.run-detail {
+  margin: 10px 0 0;
+  color: #7c8888;
+  font-size: 10px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.candidate-box {
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid #c6c6bd;
+}
+.candidate-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--teal-deep);
+  font-size: 10px;
+}
+.candidate-box pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 12px;
+  color: #44575b;
+  background: rgba(255, 255, 255, 0.45);
+  white-space: pre-wrap;
+  font:
+    12px/1.7 Georgia,
+    'Songti SC',
+    serif;
+}
 .writing-context .eyebrow {
   color: var(--teal-deep);
 }
