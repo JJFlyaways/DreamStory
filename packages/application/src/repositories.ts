@@ -7,6 +7,13 @@ import type {
   PlanContent,
   PlanKind,
   PlanNodeStatus,
+  ProposalKind,
+  ProposalStatus,
+  ReviewDisposition,
+  ReviewFindingEvidence,
+  ReviewFindingKind,
+  ReviewSeverity,
+  SourceFingerprint,
   RunIntent,
   RunStatus,
   StableId,
@@ -146,6 +153,70 @@ export interface DraftRepository {
   save(input: DraftSaveInput, expectedDraftRevision: number): Promise<DraftSaveResult | null>;
 }
 
+export interface ProposalRecord {
+  id: StableId;
+  bookId: StableId;
+  kind: ProposalKind;
+  payload: unknown;
+  revision: number;
+  sourceFingerprint: SourceFingerprint;
+  status: ProposalStatus;
+  sourceRunId: StableId | null;
+  createdAt: IsoUtcDateTime;
+  updatedAt: IsoUtcDateTime;
+}
+
+export interface ProposalRepository {
+  get(bookId: StableId, id: StableId): Promise<ProposalRecord | null>;
+  list(bookId: StableId): Promise<readonly ProposalRecord[]>;
+  save(proposal: ProposalRecord): Promise<void>;
+  updateStatus(
+    bookId: StableId,
+    id: StableId,
+    status: ProposalStatus,
+    updatedAt: IsoUtcDateTime,
+  ): Promise<ProposalRecord | null>;
+}
+
+export interface ReviewRecord {
+  id: StableId;
+  chapterId: StableId;
+  draftVersionId: StableId;
+  draftHash: ContentHash;
+  revision: number;
+  createdAt: IsoUtcDateTime;
+}
+
+export interface ReviewFindingRecord {
+  id: StableId;
+  reviewId: StableId;
+  chapterId: StableId;
+  draftVersionId: StableId;
+  draftHash: ContentHash;
+  revision: number;
+  kind: ReviewFindingKind;
+  severity: ReviewSeverity;
+  claim: string;
+  evidence: ReviewFindingEvidence;
+  suggestion: string;
+  disposition: ReviewDisposition;
+  createdAt: IsoUtcDateTime;
+  updatedAt: IsoUtcDateTime;
+}
+
+export interface ReviewRepository {
+  get(bookId: StableId, reviewId: StableId): Promise<ReviewRecord | null>;
+  listByChapter(bookId: StableId, chapterId: StableId): Promise<readonly ReviewRecord[]>;
+  listFindings(reviewId: StableId): Promise<readonly ReviewFindingRecord[]>;
+  save(review: ReviewRecord, findings: readonly ReviewFindingRecord[]): Promise<void>;
+  updateFindingDisposition(
+    findingId: StableId,
+    expectedRevision: number,
+    disposition: ReviewDisposition,
+    updatedAt: IsoUtcDateTime,
+  ): Promise<ReviewFindingRecord | null>;
+}
+
 export interface OutboxJobRecord {
   id: StableId;
   kind: string;
@@ -185,6 +256,8 @@ export interface RepositorySet {
   plans: PlanRepository;
   chapters: ChapterRepository;
   drafts: DraftRepository;
+  proposals: ProposalRepository;
+  reviews: ReviewRepository;
   commandReceipts: CommandReceiptRepository;
   outboxJobs: OutboxJobRepository;
   runs: RunPersistenceRepository;

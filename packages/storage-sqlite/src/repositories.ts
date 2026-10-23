@@ -26,6 +26,11 @@ import type {
   PlanNodeRecord,
   PlanNodeSaveResult,
   PlanRepository,
+  ProposalRecord,
+  ProposalRepository,
+  ReviewFindingRecord,
+  ReviewRecord,
+  ReviewRepository,
   RepositorySet,
   RunArtifactRecord,
   RunCreateInput,
@@ -53,6 +58,9 @@ import {
   inputSnapshots,
   modelCalls,
   bookLeases,
+  proposals,
+  reviews,
+  reviewFindings,
 } from './schema.js';
 
 export function createSqliteRepositories(database: StoryDatabase): RepositorySet {
@@ -61,6 +69,8 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     plans: new SqlitePlanRepository(database),
     chapters: new SqliteChapterRepository(database),
     drafts: new SqliteDraftRepository(database),
+    proposals: new SqliteProposalRepository(database),
+    reviews: new SqliteReviewRepository(database),
     commandReceipts: new SqliteCommandReceiptRepository(database),
     outboxJobs: new SqliteOutboxJobRepository(database),
     runs: new SqliteRunRepository(database),
@@ -414,6 +424,176 @@ export class SqliteCommandReceiptRepository implements CommandReceiptRepository 
       })
       .onConflictDoNothing()
       .run();
+  }
+}
+
+export class SqliteProposalRepository implements ProposalRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async get(bookId: StableId, id: StableId): Promise<ProposalRecord | null> {
+    const row = this.database
+      .select()
+      .from(proposals)
+      .where(and(eq(proposals.bookId, bookId), eq(proposals.id, id)))
+      .get();
+    return row === undefined ? null : mapProposal(row);
+  }
+
+  async list(bookId: StableId): Promise<readonly ProposalRecord[]> {
+    return this.database
+      .select()
+      .from(proposals)
+      .where(eq(proposals.bookId, bookId))
+      .orderBy(desc(proposals.updatedAt))
+      .all()
+      .map(mapProposal);
+  }
+
+  async save(proposal: ProposalRecord): Promise<void> {
+    this.database
+      .insert(proposals)
+      .values({
+        id: proposal.id,
+        bookId: proposal.bookId,
+        kind: proposal.kind,
+        payloadJson: stringifyJson(proposal.payload),
+        revision: proposal.revision,
+        sourceFingerprint: proposal.sourceFingerprint,
+        status: proposal.status,
+        sourceRunId: proposal.sourceRunId,
+        createdAt: proposal.createdAt,
+        updatedAt: proposal.updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: proposals.id,
+        set: {
+          payloadJson: stringifyJson(proposal.payload),
+          revision: proposal.revision,
+          sourceFingerprint: proposal.sourceFingerprint,
+          status: proposal.status,
+          sourceRunId: proposal.sourceRunId,
+          updatedAt: proposal.updatedAt,
+        },
+      })
+      .run();
+  }
+
+  async updateStatus(
+    bookId: StableId,
+    id: StableId,
+    status: ProposalRecord['status'],
+    updatedAt: IsoUtcDateTime,
+  ): Promise<ProposalRecord | null> {
+    const current = this.database
+      .select()
+      .from(proposals)
+      .where(and(eq(proposals.bookId, bookId), eq(proposals.id, id)))
+      .get();
+    if (current === undefined) return null;
+    this.database
+      .update(proposals)
+      .set({ status, updatedAt, revision: current.revision + 1 })
+      .where(and(eq(proposals.bookId, bookId), eq(proposals.id, id)))
+      .run();
+    return this.get(bookId, id);
+  }
+}
+
+export class SqliteReviewRepository implements ReviewRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async get(bookId: StableId, reviewId: StableId): Promise<ReviewRecord | null> {
+    const review = this.database.select().from(reviews).where(eq(reviews.id, reviewId)).get();
+    if (review === undefined) return null;
+    const chapter = this.database
+      .select()
+      .from(chapters)
+      .where(and(eq(chapters.id, review.chapterId), eq(chapters.bookId, bookId)))
+      .get();
+    return chapter === undefined ? null : mapReview(review);
+  }
+
+  async listByChapter(bookId: StableId, chapterId: StableId): Promise<readonly ReviewRecord[]> {
+    const chapter = this.database
+      .select()
+      .from(chapters)
+      .where(and(eq(chapters.id, chapterId), eq(chapters.bookId, bookId)))
+      .get();
+    if (chapter === undefined) return [];
+    return this.database
+      .select()
+      .from(reviews)
+      .where(eq(reviews.chapterId, chapterId))
+      .orderBy(desc(reviews.createdAt))
+      .all()
+      .map(mapReview);
+  }
+
+  async listFindings(reviewId: StableId): Promise<readonly ReviewFindingRecord[]> {
+    return this.database
+      .select()
+      .from(reviewFindings)
+      .where(eq(reviewFindings.reviewId, reviewId))
+      .orderBy(asc(reviewFindings.id))
+      .all()
+      .map(mapReviewFinding);
+  }
+
+  async save(review: ReviewRecord, findings: readonly ReviewFindingRecord[]): Promise<void> {
+    this.database.transaction((tx) => {
+      tx.insert(reviews)
+        .values({
+          id: review.id,
+          chapterId: review.chapterId,
+          draftVersionId: review.draftVersionId,
+          draftHash: review.draftHash,
+          revision: review.revision,
+          createdAt: review.createdAt,
+        })
+        .run();
+      if (findings.length > 0) {
+        tx.insert(reviewFindings)
+          .values(
+            findings.map((finding) => ({
+              id: finding.id,
+              reviewId: finding.reviewId,
+              chapterId: finding.chapterId,
+              draftVersionId: finding.draftVersionId,
+              draftHash: finding.draftHash,
+              revision: finding.revision,
+              kind: finding.kind,
+              severity: finding.severity,
+              claim: finding.claim,
+              evidenceJson: stringifyJson(finding.evidence),
+              suggestion: finding.suggestion,
+              disposition: finding.disposition,
+              createdAt: finding.createdAt,
+              updatedAt: finding.updatedAt,
+            })),
+          )
+          .run();
+      }
+    });
+  }
+
+  async updateFindingDisposition(
+    findingId: StableId,
+    expectedRevision: number,
+    disposition: ReviewFindingRecord['disposition'],
+    updatedAt: IsoUtcDateTime,
+  ): Promise<ReviewFindingRecord | null> {
+    const result = this.database
+      .update(reviewFindings)
+      .set({ disposition, revision: expectedRevision + 1, updatedAt })
+      .where(and(eq(reviewFindings.id, findingId), eq(reviewFindings.revision, expectedRevision)))
+      .run();
+    if (result.changes !== 1) return null;
+    const row = this.database
+      .select()
+      .from(reviewFindings)
+      .where(eq(reviewFindings.id, findingId))
+      .get();
+    return row === undefined ? null : mapReviewFinding(row);
   }
 }
 
@@ -854,6 +1034,51 @@ function mapLease(row: typeof bookLeases.$inferSelect): BookLeaseRecord {
     ownerId: parseStableId(row.ownerId),
     expiresAt: parseUtcDateTime(row.expiresAt),
     heartbeatAt: parseUtcDateTime(row.heartbeatAt),
+  };
+}
+
+function mapProposal(row: typeof proposals.$inferSelect): ProposalRecord {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    kind: row.kind,
+    payload: parseJson(row.payloadJson),
+    revision: row.revision,
+    sourceFingerprint: parseSourceFingerprint(row.sourceFingerprint),
+    status: row.status,
+    sourceRunId: row.sourceRunId === null ? null : parseStableId(row.sourceRunId),
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapReview(row: typeof reviews.$inferSelect): ReviewRecord {
+  return {
+    id: parseStableId(row.id),
+    chapterId: parseStableId(row.chapterId),
+    draftVersionId: parseStableId(row.draftVersionId),
+    draftHash: parseContentHash(row.draftHash),
+    revision: row.revision,
+    createdAt: parseUtcDateTime(row.createdAt),
+  };
+}
+
+function mapReviewFinding(row: typeof reviewFindings.$inferSelect): ReviewFindingRecord {
+  return {
+    id: parseStableId(row.id),
+    reviewId: parseStableId(row.reviewId),
+    chapterId: parseStableId(row.chapterId),
+    draftVersionId: parseStableId(row.draftVersionId),
+    draftHash: parseContentHash(row.draftHash),
+    revision: row.revision,
+    kind: row.kind,
+    severity: row.severity,
+    claim: row.claim,
+    evidence: parseJson(row.evidenceJson) as ReviewFindingRecord['evidence'],
+    suggestion: row.suggestion,
+    disposition: row.disposition,
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
   };
 }
 

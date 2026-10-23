@@ -6,5 +6,6 @@ export * from './errors.js';
 export * from './events.js';
 export * from './ids.js';
 export * from './revisions.js';
+export * from './review.js';
 export * from './runs.js';
 export * from './source-ref.js';

@@ -2,10 +2,12 @@ import { initialOperationalTablesMigration } from './0001-initial-operational-ta
 import { booksMigration } from './0002-books.js';
 import { writingModelMigration } from './0003-writing-model.js';
 import { agentRuntimeMigration } from './0004-agent-runtime.js';
+import { reviewProposalMigration } from './0005-review-proposals.js';
 
 export const INITIAL_MIGRATIONS = [
   initialOperationalTablesMigration,
   booksMigration,
   writingModelMigration,
   agentRuntimeMigration,
+  reviewProposalMigration,
 ] as const;

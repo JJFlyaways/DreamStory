@@ -40,6 +40,11 @@ export const runArtifactKinds = [
   'revision_candidate',
 ] as const;
 export const usageKinds = ['reported', 'estimated', 'unknown'] as const;
+export const proposalKinds = ['plan', 'fact', 'revision'] as const;
+export const proposalStatuses = ['pending', 'accepted', 'rejected', 'stale'] as const;
+export const reviewFindingKinds = ['continuity', 'style', 'plot', 'fact'] as const;
+export const reviewSeverities = ['info', 'minor', 'major'] as const;
+export const reviewDispositions = ['open', 'accept', 'ignore', 'intentional'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -268,6 +273,57 @@ export const bookLeases = sqliteTable('book_leases', {
   heartbeatAt: text('heartbeat_at').notNull(),
 });
 
+export const proposals = sqliteTable(
+  'proposals',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    kind: text('kind', { enum: proposalKinds }).notNull(),
+    payloadJson: text('payload_json').notNull(),
+    revision: integer('revision').notNull(),
+    sourceFingerprint: text('source_fingerprint').notNull(),
+    status: text('status', { enum: proposalStatuses }).notNull(),
+    sourceRunId: text('source_run_id'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('proposals_book_status_idx').on(table.bookId, table.status, table.updatedAt)],
+);
+
+export const reviews = sqliteTable(
+  'reviews',
+  {
+    id: text('id').primaryKey(),
+    chapterId: text('chapter_id').notNull(),
+    draftVersionId: text('draft_version_id').notNull(),
+    draftHash: text('draft_hash').notNull(),
+    revision: integer('revision').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('reviews_chapter_created_idx').on(table.chapterId, table.createdAt)],
+);
+
+export const reviewFindings = sqliteTable(
+  'review_findings',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id').notNull(),
+    chapterId: text('chapter_id').notNull(),
+    draftVersionId: text('draft_version_id').notNull(),
+    draftHash: text('draft_hash').notNull(),
+    revision: integer('revision').notNull(),
+    kind: text('kind', { enum: reviewFindingKinds }).notNull(),
+    severity: text('severity', { enum: reviewSeverities }).notNull(),
+    claim: text('claim').notNull(),
+    evidenceJson: text('evidence_json').notNull(),
+    suggestion: text('suggestion').notNull(),
+    disposition: text('disposition', { enum: reviewDispositions }).notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('review_findings_review_idx').on(table.reviewId, table.revision)],
+);
+
 export const schema = {
   books,
   planNodes,
@@ -280,6 +336,9 @@ export const schema = {
   runArtifacts,
   modelCalls,
   bookLeases,
+  proposals,
+  reviews,
+  reviewFindings,
   commandReceipts,
   outboxJobs,
   runs,
