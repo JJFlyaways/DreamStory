@@ -217,6 +217,26 @@ export interface ReviewRepository {
   ): Promise<ReviewFindingRecord | null>;
 }
 
+export interface FinalizationRecord {
+  id: StableId;
+  chapterId: StableId;
+  draftVersionId: StableId;
+  content: string;
+  contentHash: ContentHash;
+  supersedesId: StableId | null;
+  committedAt: IsoUtcDateTime;
+}
+
+export interface FinalizationRepository {
+  get(id: StableId): Promise<FinalizationRecord | null>;
+  list(chapterId: StableId): Promise<readonly FinalizationRecord[]>;
+  finalize(
+    finalization: FinalizationRecord,
+    expectedBookRevision: BookRevision,
+    outboxJobs: readonly OutboxJobRecord[],
+  ): Promise<{ finalization: FinalizationRecord; bookRevision: BookRevision } | null>;
+}
+
 export interface OutboxJobRecord {
   id: StableId;
   kind: string;
@@ -258,6 +278,7 @@ export interface RepositorySet {
   drafts: DraftRepository;
   proposals: ProposalRepository;
   reviews: ReviewRepository;
+  finalizations: FinalizationRepository;
   commandReceipts: CommandReceiptRepository;
   outboxJobs: OutboxJobRepository;
   runs: RunPersistenceRepository;

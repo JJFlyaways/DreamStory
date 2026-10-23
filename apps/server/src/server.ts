@@ -11,10 +11,13 @@ import {
   DraftService,
   PlanService,
   WritingCommandError,
+  FinalizationError,
+  FinalizationService,
   renderBookExport,
   type CreateBookCommand,
   type CreateChapterCommand,
   type ExportFormat,
+  type FinalizeChapterCommand,
   type BookRecord,
   type PlanNodeCommand,
   type RestoreDraftCommand,
@@ -271,6 +274,24 @@ export class BookProjectManager {
       initialized.repositories.drafts,
       initialized.repositories.commandReceipts,
     ).restore(command);
+  }
+
+  async finalizeChapter(command: FinalizeChapterCommand) {
+    const initialized = await this.openBook(command.bookId);
+    return new FinalizationService(
+      initialized.repositories.books,
+      initialized.repositories.chapters,
+      initialized.repositories.drafts,
+      initialized.repositories.finalizations,
+      initialized.repositories.commandReceipts,
+    ).finalize(command);
+  }
+
+  async listFinalizations(bookId: StableId, chapterId: StableId) {
+    const initialized = await this.openBook(bookId);
+    const chapter = await initialized.repositories.chapters.get(bookId, chapterId);
+    if (chapter === null) throw new BookCommandError('NOT_FOUND', 'The chapter does not exist.');
+    return initialized.repositories.finalizations.list(chapterId);
   }
 
   async createBackup(bookId: StableId): Promise<BackupResult> {
@@ -893,6 +914,44 @@ export function createServer(
     },
   );
 
+  app.post<{
+    Params: { bookId: string; chapterId: string };
+  }>('/api/v1/books/:bookId/chapters/:chapterId/finalizations', async (request, reply) => {
+    if (!requireWriteSecurity(request, reply, sessions)) return;
+    try {
+      const body = parseFinalizationBody(request.body);
+      const result = await projectManager.finalizeChapter({
+        bookId: parseBookId(request.params.bookId),
+        chapterId: parseStableId(request.params.chapterId),
+        clientRequestId: body.clientRequestId,
+        expectedBookRevision: body.expectedBookRevision,
+        expectedDraftRevision: body.expectedDraftRevision,
+        draftVersionId: body.draftVersionId,
+        contentHash: body.contentHash,
+        committedAt: nowUtc(),
+      });
+      return reply.code(result.replayed ? 200 : 201).send({ data: result });
+    } catch (error) {
+      return sendCommandError(reply, request, error);
+    }
+  });
+
+  app.get<{ Params: { bookId: string; chapterId: string } }>(
+    '/api/v1/books/:bookId/chapters/:chapterId/finalizations',
+    async (request, reply) => {
+      try {
+        return {
+          data: await projectManager.listFinalizations(
+            parseBookId(request.params.bookId),
+            parseStableId(request.params.chapterId),
+          ),
+        };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
   app.addHook('onClose', async () => {
     await projectManager.closeAll();
   });
@@ -1073,6 +1132,29 @@ function parseExportFormat(value: unknown): ExportFormat {
     return value;
   }
   throw new Error('format must be markdown or txt.');
+}
+
+function parseFinalizationBody(value: unknown): {
+  clientRequestId: ReturnType<typeof parseClientRequestId>;
+  expectedBookRevision: BookRevision;
+  expectedDraftRevision: number;
+  draftVersionId: StableId;
+  contentHash: string;
+} {
+  const record = asRecord(value);
+  return {
+    clientRequestId: parseClientRequestId(requiredString(record['clientRequestId'])),
+    expectedBookRevision: parsePositiveInteger(
+      record['expectedBookRevision'],
+      'expectedBookRevision',
+    ),
+    expectedDraftRevision: parseNonNegativeInteger(
+      record['expectedDraftRevision'],
+      'expectedDraftRevision',
+    ),
+    draftVersionId: parseStableId(requiredString(record['draftVersionId'])),
+    contentHash: requiredString(record['contentHash']),
+  };
 }
 
 function parseRunStartBody(value: unknown): StartAgentRunInput {
@@ -1300,6 +1382,20 @@ function requireWriteSecurity(
 }
 
 function sendCommandError(reply: FastifyReply, request: FastifyRequest, error: unknown) {
+  if (error instanceof FinalizationError) {
+    if (error.code === 'NOT_FOUND') {
+      return sendError(reply, request, 404, 'NOT_FOUND', error.message);
+    }
+    if (error.code === 'REVISION_CONFLICT') {
+      return sendError(reply, request, 409, 'REVISION_CONFLICT', error.message, {
+        currentBookRevision: error.currentBookRevision,
+      });
+    }
+    if (error.code === 'SOURCE_STALE') {
+      return sendError(reply, request, 409, 'SOURCE_STALE', error.message);
+    }
+    return sendError(reply, request, 422, 'PRECONDITION_FAILED', error.message);
+  }
   if (error instanceof BookCommandError) {
     if (error.code === 'NOT_FOUND') {
       return sendError(reply, request, 404, 'NOT_FOUND', error.message);

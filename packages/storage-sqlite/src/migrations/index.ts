@@ -3,6 +3,7 @@ import { booksMigration } from './0002-books.js';
 import { writingModelMigration } from './0003-writing-model.js';
 import { agentRuntimeMigration } from './0004-agent-runtime.js';
 import { reviewProposalMigration } from './0005-review-proposals.js';
+import { finalizationsMigration } from './0006-finalizations.js';
 
 export const INITIAL_MIGRATIONS = [
   initialOperationalTablesMigration,
@@ -10,4 +11,5 @@ export const INITIAL_MIGRATIONS = [
   writingModelMigration,
   agentRuntimeMigration,
   reviewProposalMigration,
+  finalizationsMigration,
 ] as const;

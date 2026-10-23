@@ -324,6 +324,20 @@ export const reviewFindings = sqliteTable(
   (table) => [index('review_findings_review_idx').on(table.reviewId, table.revision)],
 );
 
+export const finalizations = sqliteTable(
+  'finalizations',
+  {
+    id: text('id').primaryKey(),
+    chapterId: text('chapter_id').notNull(),
+    draftVersionId: text('draft_version_id').notNull(),
+    content: text('content').notNull(),
+    contentHash: text('content_hash').notNull(),
+    supersedesId: text('supersedes_id'),
+    committedAt: text('committed_at').notNull(),
+  },
+  (table) => [index('finalizations_chapter_committed_idx').on(table.chapterId, table.committedAt)],
+);
+
 export const schema = {
   books,
   planNodes,
@@ -339,6 +353,7 @@ export const schema = {
   proposals,
   reviews,
   reviewFindings,
+  finalizations,
   commandReceipts,
   outboxJobs,
   runs,

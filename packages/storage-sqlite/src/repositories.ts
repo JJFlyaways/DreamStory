@@ -19,6 +19,8 @@ import type {
   DraftSaveInput,
   DraftSaveResult,
   DraftVersionRecord,
+  FinalizationRecord,
+  FinalizationRepository,
   InputSnapshotRecord,
   ModelCallRecord,
   OutboxJobRecord,
@@ -61,6 +63,7 @@ import {
   proposals,
   reviews,
   reviewFindings,
+  finalizations,
 } from './schema.js';
 
 export function createSqliteRepositories(database: StoryDatabase): RepositorySet {
@@ -71,6 +74,7 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     drafts: new SqliteDraftRepository(database),
     proposals: new SqliteProposalRepository(database),
     reviews: new SqliteReviewRepository(database),
+    finalizations: new SqliteFinalizationRepository(database),
     commandReceipts: new SqliteCommandReceiptRepository(database),
     outboxJobs: new SqliteOutboxJobRepository(database),
     runs: new SqliteRunRepository(database),
@@ -597,6 +601,78 @@ export class SqliteReviewRepository implements ReviewRepository {
   }
 }
 
+export class SqliteFinalizationRepository implements FinalizationRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async get(id: StableId): Promise<FinalizationRecord | null> {
+    const row = this.database.select().from(finalizations).where(eq(finalizations.id, id)).get();
+    return row === undefined ? null : mapFinalization(row);
+  }
+
+  async list(chapterId: StableId): Promise<readonly FinalizationRecord[]> {
+    return this.database
+      .select()
+      .from(finalizations)
+      .where(eq(finalizations.chapterId, chapterId))
+      .orderBy(desc(finalizations.committedAt))
+      .all()
+      .map(mapFinalization);
+  }
+
+  async finalize(
+    finalization: FinalizationRecord,
+    expectedBookRevision: number,
+    outbox: readonly OutboxJobRecord[],
+  ): Promise<{ finalization: FinalizationRecord; bookRevision: number } | null> {
+    return this.database.transaction((tx) => {
+      const chapter = tx
+        .select()
+        .from(chapters)
+        .where(eq(chapters.id, finalization.chapterId))
+        .get();
+      if (chapter === undefined) return null;
+      const book = tx.select().from(books).where(eq(books.id, chapter.bookId)).get();
+      if (book === undefined || book.bookRevision !== expectedBookRevision) return null;
+      const bookRevision = expectedBookRevision + 1;
+      tx.update(books)
+        .set({ bookRevision, updatedAt: finalization.committedAt })
+        .where(and(eq(books.id, chapter.bookId), eq(books.bookRevision, expectedBookRevision)))
+        .run();
+      tx.insert(finalizations)
+        .values({
+          id: finalization.id,
+          chapterId: finalization.chapterId,
+          draftVersionId: finalization.draftVersionId,
+          content: finalization.content,
+          contentHash: finalization.contentHash,
+          supersedesId: finalization.supersedesId,
+          committedAt: finalization.committedAt,
+        })
+        .run();
+      tx.update(chapters)
+        .set({ currentFinalizationId: finalization.id, updatedAt: finalization.committedAt })
+        .where(eq(chapters.id, finalization.chapterId))
+        .run();
+      for (const job of outbox) {
+        tx.insert(outboxJobs)
+          .values({
+            id: job.id,
+            kind: job.kind,
+            sourceId: job.sourceId,
+            sourceHash: job.sourceHash,
+            status: job.status,
+            attempts: job.attempts,
+            lastError: job.lastError,
+            createdAt: job.createdAt,
+            updatedAt: job.updatedAt,
+          })
+          .run();
+      }
+      return { finalization, bookRevision };
+    });
+  }
+}
+
 export class SqliteOutboxJobRepository implements OutboxJobRepository {
   constructor(private readonly database: StoryDatabase) {}
 
@@ -1079,6 +1155,18 @@ function mapReviewFinding(row: typeof reviewFindings.$inferSelect): ReviewFindin
     disposition: row.disposition,
     createdAt: parseUtcDateTime(row.createdAt),
     updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapFinalization(row: typeof finalizations.$inferSelect): FinalizationRecord {
+  return {
+    id: parseStableId(row.id),
+    chapterId: parseStableId(row.chapterId),
+    draftVersionId: parseStableId(row.draftVersionId),
+    content: row.content,
+    contentHash: parseContentHash(row.contentHash),
+    supersedesId: row.supersedesId === null ? null : parseStableId(row.supersedesId),
+    committedAt: parseUtcDateTime(row.committedAt),
   };
 }
 

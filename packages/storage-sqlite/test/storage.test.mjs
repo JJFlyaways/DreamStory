@@ -156,7 +156,7 @@ test('initializes the operational schema and provides repository adapters', asyn
       now: new Date('2026-10-20T12:34:56.789Z'),
     });
 
-    assert.equal(initialized.migration.currentVersion, 5);
+    assert.equal(initialized.migration.currentVersion, 6);
     assert.deepEqual(
       initialized.connection.db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -168,6 +168,7 @@ test('initializes the operational schema and provides repository adapters', asyn
         'chapters',
         'command_receipts',
         'draft_versions',
+        'finalizations',
         'input_snapshots',
         'model_calls',
         'outbox_jobs',
