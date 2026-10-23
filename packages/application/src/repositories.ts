@@ -11,6 +11,7 @@ import type {
   RunStatus,
   StableId,
 } from '@dreamstory/contracts';
+import type { RunPersistenceRepository } from './runs.js';
 
 export type OutboxJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
@@ -179,12 +180,6 @@ export interface RunRecord {
   updatedAt: IsoUtcDateTime;
 }
 
-export interface RunRepository {
-  create(run: RunRecord): Promise<void>;
-  get(id: StableId): Promise<RunRecord | null>;
-  updateStatus(id: StableId, status: RunStatus, error?: unknown): Promise<void>;
-}
-
 export interface RepositorySet {
   books: BookRepository;
   plans: PlanRepository;
@@ -192,7 +187,7 @@ export interface RepositorySet {
   drafts: DraftRepository;
   commandReceipts: CommandReceiptRepository;
   outboxJobs: OutboxJobRepository;
-  runs: RunRepository;
+  runs: RunPersistenceRepository;
 }
 
 export interface BookRevisionContext {

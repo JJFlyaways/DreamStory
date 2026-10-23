@@ -156,20 +156,26 @@ test('initializes the operational schema and provides repository adapters', asyn
       now: new Date('2026-10-20T12:34:56.789Z'),
     });
 
-    assert.equal(initialized.migration.currentVersion, 3);
+    assert.equal(initialized.migration.currentVersion, 4);
     assert.deepEqual(
       initialized.connection.db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .pluck()
         .all(),
       [
+        'book_leases',
         'books',
         'chapters',
         'command_receipts',
         'draft_versions',
+        'input_snapshots',
+        'model_calls',
         'outbox_jobs',
         'plan_node_versions',
         'plan_nodes',
+        'run_artifacts',
+        'run_events',
+        'run_steps',
         'runs',
       ],
     );
@@ -398,6 +404,144 @@ test('initializes the operational schema and provides repository adapters', asyn
     assert.equal((await reopened.repositories.drafts.current('chapter_01')).id, 'draft_02');
     assert.equal((await reopened.repositories.drafts.list('chapter_01')).length, 2);
     reopened.connection.close();
+  } finally {
+    await removeTestDirectory(directory);
+  }
+});
+
+test('persists recoverable run state, artifacts, model calls, and leases', async () => {
+  const directory = await createTestDirectory();
+  try {
+    const initialized = await initializeProjectDatabase(directory);
+    const createdAt = '2026-10-23T12:00:00.000Z';
+    const run = {
+      id: 'run_p2_01',
+      bookId: 'book_01',
+      intent: 'draft_chapter',
+      scope: { chapterNumbers: [1] },
+      status: 'queued',
+      inputSnapshotId: 'snapshot_01',
+      lease: null,
+      attempt: 0,
+      error: null,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    await initialized.repositories.runs.create(run);
+    await initialized.repositories.runs.createStep({
+      id: 'step_p2_01',
+      runId: run.id,
+      sequence: 0,
+      name: 'build_context',
+      status: 'pending',
+      attempt: 0,
+      inputSnapshotId: null,
+      artifactId: null,
+      error: null,
+      startedAt: null,
+      completedAt: null,
+      createdAt,
+      updatedAt: createdAt,
+    });
+    await initialized.repositories.runs.updateStep('step_p2_01', {
+      status: 'completed',
+      completedAt: createdAt,
+      updatedAt: createdAt,
+    });
+    assert.equal((await initialized.repositories.runs.listSteps(run.id))[0].status, 'completed');
+
+    const event = await initialized.repositories.runs.appendEvent({
+      runId: run.id,
+      eventType: 'run.started',
+      payload: { status: 'running' },
+      createdAt,
+    });
+    const secondEvent = await initialized.repositories.runs.appendEvent({
+      runId: run.id,
+      eventType: 'step.completed',
+      payload: { stepId: 'step_p2_01' },
+      createdAt,
+    });
+    assert.equal(event.sequence, 1);
+    assert.equal(secondEvent.sequence, 2);
+
+    await initialized.repositories.runs.saveInputSnapshot({
+      id: 'snapshot_01',
+      bookId: 'book_01',
+      manifest: { sources: [], sourceFingerprint: `sha256:${'a'.repeat(64)}` },
+      contextText: 'context',
+      sourceFingerprint: `sha256:${'a'.repeat(64)}`,
+      executionFingerprint: `sha256:${'b'.repeat(64)}`,
+      promptVersion: 'writer-v1',
+      createdAt,
+    });
+    assert.equal(
+      (await initialized.repositories.runs.getInputSnapshot('snapshot_01')).contextText,
+      'context',
+    );
+
+    await initialized.repositories.runs.saveArtifact({
+      id: 'artifact_p2_01',
+      runId: run.id,
+      kind: 'draft_candidate',
+      revision: 1,
+      content: '候选正文',
+      contentHash: `sha256:${'c'.repeat(64)}`,
+      complete: false,
+      createdAt,
+    });
+    assert.equal((await initialized.repositories.runs.listArtifacts(run.id)).length, 1);
+
+    await initialized.repositories.runs.reserveModelCall({
+      id: 'call_p2_01',
+      runId: run.id,
+      stepId: 'step_p2_01',
+      provider: 'openai-compatible',
+      model: 'writer-primary',
+      status: 'reserved',
+      inputTokens: null,
+      outputTokens: null,
+      usageKind: 'unknown',
+      error: null,
+      createdAt,
+      completedAt: null,
+    });
+    await initialized.repositories.runs.updateModelCall('call_p2_01', {
+      status: 'completed',
+      inputTokens: 10,
+      outputTokens: 20,
+      usageKind: 'reported',
+      completedAt: createdAt,
+    });
+    assert.equal(
+      (await initialized.repositories.runs.getModelCall('call_p2_01')).status,
+      'completed',
+    );
+
+    const lease = {
+      bookId: 'book_01',
+      ownerId: 'worker_01',
+      expiresAt: '2026-10-23T12:05:00.000Z',
+      heartbeatAt: createdAt,
+    };
+    assert.equal(await initialized.repositories.runs.acquireLease(lease), true);
+    assert.equal(
+      await initialized.repositories.runs.acquireLease({ ...lease, ownerId: 'worker_02' }),
+      false,
+    );
+    assert.equal(
+      await initialized.repositories.runs.heartbeatLease(
+        lease.bookId,
+        lease.ownerId,
+        '2026-10-23T12:06:00.000Z',
+        '2026-10-23T12:01:00.000Z',
+      ),
+      true,
+    );
+    await initialized.repositories.runs.releaseLease(lease.bookId, lease.ownerId);
+    assert.deepEqual(await initialized.repositories.runs.recoverExpiredLeases(createdAt), []);
+
+    initialized.connection.close();
   } finally {
     await removeTestDirectory(directory);
   }

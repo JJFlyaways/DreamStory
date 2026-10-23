@@ -1,12 +1,14 @@
 import {
   parseClientRequestId,
   parseContentHash,
+  parseSourceFingerprint,
   parseStableId,
   parseUtcDateTime,
 } from '@dreamstory/contracts';
 import type { ClientRequestId, IsoUtcDateTime, StableId } from '@dreamstory/contracts';
 import type {
   BookChanges,
+  BookLeaseRecord,
   BookRecord,
   BookRepository,
   ChapterRecord,
@@ -17,16 +19,23 @@ import type {
   DraftSaveInput,
   DraftSaveResult,
   DraftVersionRecord,
+  InputSnapshotRecord,
+  ModelCallRecord,
   OutboxJobRecord,
   OutboxJobRepository,
   PlanNodeRecord,
   PlanNodeSaveResult,
   PlanRepository,
   RepositorySet,
+  RunArtifactRecord,
+  RunCreateInput,
+  RunEventRecord,
+  RunStepChanges,
+  RunStepRecord,
   RunRecord,
-  RunRepository,
+  RunPersistenceRepository,
 } from '@dreamstory/application';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, lte } from 'drizzle-orm';
 
 import type { StoryDatabase } from './drizzle.js';
 import {
@@ -38,6 +47,12 @@ import {
   planNodeVersions,
   planNodes,
   runs,
+  runArtifacts,
+  runEvents,
+  runSteps,
+  inputSnapshots,
+  modelCalls,
+  bookLeases,
 } from './schema.js';
 
 export function createSqliteRepositories(database: StoryDatabase): RepositorySet {
@@ -468,10 +483,10 @@ export class SqliteOutboxJobRepository implements OutboxJobRepository {
   }
 }
 
-export class SqliteRunRepository implements RunRepository {
+export class SqliteRunRepository implements RunPersistenceRepository {
   constructor(private readonly database: StoryDatabase) {}
 
-  async create(run: RunRecord): Promise<void> {
+  async create(run: RunCreateInput): Promise<void> {
     this.database
       .insert(runs)
       .values({
@@ -481,9 +496,9 @@ export class SqliteRunRepository implements RunRepository {
         scopeJson: stringifyJson(run.scope),
         status: run.status,
         inputSnapshotId: run.inputSnapshotId,
-        leaseJson: stringifyNullableJson(run.lease),
-        attempt: run.attempt,
-        errorJson: stringifyNullableJson(run.error),
+        leaseJson: stringifyNullableJson(run.lease ?? null),
+        attempt: run.attempt ?? 0,
+        errorJson: stringifyNullableJson(run.error ?? null),
         createdAt: run.createdAt,
         updatedAt: run.updatedAt,
       })
@@ -493,6 +508,16 @@ export class SqliteRunRepository implements RunRepository {
   async get(id: StableId): Promise<RunRecord | null> {
     const row = this.database.select().from(runs).where(eq(runs.id, id)).get();
     return row === undefined ? null : mapRun(row);
+  }
+
+  async list(bookId: StableId): Promise<readonly RunRecord[]> {
+    return this.database
+      .select()
+      .from(runs)
+      .where(eq(runs.bookId, bookId))
+      .orderBy(desc(runs.createdAt))
+      .all()
+      .map(mapRun);
   }
 
   async updateStatus(id: StableId, status: RunRecord['status'], error?: unknown): Promise<void> {
@@ -506,6 +531,330 @@ export class SqliteRunRepository implements RunRepository {
       .where(eq(runs.id, id))
       .run();
   }
+
+  async createStep(step: RunStepRecord): Promise<void> {
+    this.database
+      .insert(runSteps)
+      .values({
+        id: step.id,
+        runId: step.runId,
+        sequence: step.sequence,
+        name: step.name,
+        status: step.status,
+        attempt: step.attempt,
+        inputSnapshotId: step.inputSnapshotId,
+        artifactId: step.artifactId,
+        errorJson: stringifyNullableJson(step.error),
+        startedAt: step.startedAt,
+        completedAt: step.completedAt,
+        createdAt: step.createdAt,
+        updatedAt: step.updatedAt,
+      })
+      .run();
+  }
+
+  async updateStep(id: StableId, changes: RunStepChanges): Promise<RunStepRecord | null> {
+    const values: {
+      status?: RunStepChanges['status'];
+      attempt?: number;
+      inputSnapshotId?: string | null;
+      artifactId?: string | null;
+      errorJson?: string | null;
+      startedAt?: string | null;
+      completedAt?: string | null;
+      updatedAt: string;
+    } = { updatedAt: changes.updatedAt };
+    if (changes.status !== undefined) values.status = changes.status;
+    if (changes.attempt !== undefined) values.attempt = changes.attempt;
+    if (changes.inputSnapshotId !== undefined) values.inputSnapshotId = changes.inputSnapshotId;
+    if (changes.artifactId !== undefined) values.artifactId = changes.artifactId;
+    if (changes.error !== undefined) values['errorJson'] = stringifyNullableJson(changes.error);
+    if (changes.startedAt !== undefined) values.startedAt = changes.startedAt;
+    if (changes.completedAt !== undefined) values.completedAt = changes.completedAt;
+    this.database.update(runSteps).set(values).where(eq(runSteps.id, id)).run();
+    return this.getStep(id);
+  }
+
+  async getStep(id: StableId): Promise<RunStepRecord | null> {
+    const row = this.database.select().from(runSteps).where(eq(runSteps.id, id)).get();
+    return row === undefined ? null : mapRunStep(row);
+  }
+
+  async listSteps(runId: StableId): Promise<readonly RunStepRecord[]> {
+    return this.database
+      .select()
+      .from(runSteps)
+      .where(eq(runSteps.runId, runId))
+      .orderBy(asc(runSteps.sequence))
+      .all()
+      .map(mapRunStep);
+  }
+
+  async appendEvent(event: Omit<RunEventRecord, 'sequence'>): Promise<RunEventRecord> {
+    return this.database.transaction((tx) => {
+      const last = tx
+        .select()
+        .from(runEvents)
+        .where(eq(runEvents.runId, event.runId))
+        .orderBy(desc(runEvents.sequence))
+        .limit(1)
+        .get();
+      const record = {
+        ...event,
+        sequence: (last?.sequence ?? 0) + 1,
+      };
+      tx.insert(runEvents)
+        .values({
+          runId: record.runId,
+          sequence: record.sequence,
+          eventType: record.eventType,
+          payloadJson: stringifyJson(record.payload),
+          createdAt: record.createdAt,
+        })
+        .run();
+      return record;
+    });
+  }
+
+  async listEvents(runId: StableId, afterSequence = 0): Promise<readonly RunEventRecord[]> {
+    return this.database
+      .select()
+      .from(runEvents)
+      .where(eq(runEvents.runId, runId))
+      .orderBy(asc(runEvents.sequence))
+      .all()
+      .filter((row) => row.sequence > afterSequence)
+      .map(mapRunEvent);
+  }
+
+  async saveInputSnapshot(snapshot: InputSnapshotRecord): Promise<void> {
+    this.database
+      .insert(inputSnapshots)
+      .values({
+        id: snapshot.id,
+        bookId: snapshot.bookId,
+        manifestJson: stringifyJson(snapshot.manifest),
+        contextText: snapshot.contextText,
+        sourceFingerprint: snapshot.sourceFingerprint,
+        executionFingerprint: snapshot.executionFingerprint,
+        promptVersion: snapshot.promptVersion,
+        createdAt: snapshot.createdAt,
+      })
+      .run();
+  }
+
+  async getInputSnapshot(id: StableId): Promise<InputSnapshotRecord | null> {
+    const row = this.database.select().from(inputSnapshots).where(eq(inputSnapshots.id, id)).get();
+    return row === undefined ? null : mapInputSnapshot(row);
+  }
+
+  async saveArtifact(artifact: RunArtifactRecord): Promise<void> {
+    this.database
+      .insert(runArtifacts)
+      .values({
+        id: artifact.id,
+        runId: artifact.runId,
+        kind: artifact.kind,
+        revision: artifact.revision,
+        content: artifact.content,
+        contentHash: artifact.contentHash,
+        complete: artifact.complete,
+        createdAt: artifact.createdAt,
+      })
+      .run();
+  }
+
+  async getArtifact(id: StableId): Promise<RunArtifactRecord | null> {
+    const row = this.database.select().from(runArtifacts).where(eq(runArtifacts.id, id)).get();
+    return row === undefined ? null : mapArtifact(row);
+  }
+
+  async listArtifacts(runId: StableId): Promise<readonly RunArtifactRecord[]> {
+    return this.database
+      .select()
+      .from(runArtifacts)
+      .where(eq(runArtifacts.runId, runId))
+      .orderBy(desc(runArtifacts.revision))
+      .all()
+      .map(mapArtifact);
+  }
+
+  async reserveModelCall(call: ModelCallRecord): Promise<void> {
+    this.database.insert(modelCalls).values(mapModelCallInsert(call)).run();
+  }
+
+  async updateModelCall(id: StableId, changes: Partial<ModelCallRecord>): Promise<void> {
+    const values: Record<string, unknown> = {};
+    for (const field of [
+      'provider',
+      'model',
+      'status',
+      'inputTokens',
+      'outputTokens',
+      'usageKind',
+      'completedAt',
+    ] as const) {
+      if (changes[field] !== undefined) values[field] = changes[field];
+    }
+    if (changes.error !== undefined) values['errorJson'] = stringifyNullableJson(changes.error);
+    this.database.update(modelCalls).set(values).where(eq(modelCalls.id, id)).run();
+  }
+
+  async getModelCall(id: StableId): Promise<ModelCallRecord | null> {
+    const row = this.database.select().from(modelCalls).where(eq(modelCalls.id, id)).get();
+    return row === undefined ? null : mapModelCall(row);
+  }
+
+  async acquireLease(lease: BookLeaseRecord): Promise<boolean> {
+    return this.database.transaction((tx) => {
+      const current = tx.select().from(bookLeases).where(eq(bookLeases.bookId, lease.bookId)).get();
+      if (current && current.ownerId !== lease.ownerId && current.expiresAt > lease.heartbeatAt) {
+        return false;
+      }
+      tx.insert(bookLeases)
+        .values(lease)
+        .onConflictDoUpdate({
+          target: bookLeases.bookId,
+          set: {
+            ownerId: lease.ownerId,
+            expiresAt: lease.expiresAt,
+            heartbeatAt: lease.heartbeatAt,
+          },
+        })
+        .run();
+      return true;
+    });
+  }
+
+  async heartbeatLease(
+    bookId: StableId,
+    ownerId: StableId,
+    expiresAt: IsoUtcDateTime,
+    heartbeatAt: IsoUtcDateTime,
+  ): Promise<boolean> {
+    const result = this.database
+      .update(bookLeases)
+      .set({ expiresAt, heartbeatAt })
+      .where(and(eq(bookLeases.bookId, bookId), eq(bookLeases.ownerId, ownerId)))
+      .run();
+    return result.changes === 1;
+  }
+
+  async releaseLease(bookId: StableId, ownerId: StableId): Promise<void> {
+    this.database
+      .delete(bookLeases)
+      .where(and(eq(bookLeases.bookId, bookId), eq(bookLeases.ownerId, ownerId)))
+      .run();
+  }
+
+  async recoverExpiredLeases(now: IsoUtcDateTime): Promise<readonly BookLeaseRecord[]> {
+    const expired = this.database
+      .select()
+      .from(bookLeases)
+      .where(lte(bookLeases.expiresAt, now))
+      .all();
+    for (const lease of expired) {
+      this.database.delete(bookLeases).where(eq(bookLeases.bookId, lease.bookId)).run();
+    }
+    return expired.map(mapLease);
+  }
+}
+
+function mapRunStep(row: typeof runSteps.$inferSelect): RunStepRecord {
+  return {
+    id: parseStableId(row.id),
+    runId: parseStableId(row.runId),
+    sequence: row.sequence,
+    name: row.name,
+    status: row.status,
+    attempt: row.attempt,
+    inputSnapshotId: row.inputSnapshotId === null ? null : parseStableId(row.inputSnapshotId),
+    artifactId: row.artifactId === null ? null : parseStableId(row.artifactId),
+    error: parseNullableJson(row.errorJson),
+    startedAt: row.startedAt === null ? null : parseUtcDateTime(row.startedAt),
+    completedAt: row.completedAt === null ? null : parseUtcDateTime(row.completedAt),
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapRunEvent(row: typeof runEvents.$inferSelect): RunEventRecord {
+  return {
+    runId: parseStableId(row.runId),
+    sequence: row.sequence,
+    eventType: row.eventType,
+    payload: parseJson(row.payloadJson),
+    createdAt: parseUtcDateTime(row.createdAt),
+  };
+}
+
+function mapInputSnapshot(row: typeof inputSnapshots.$inferSelect): InputSnapshotRecord {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    manifest: parseJson(row.manifestJson) as InputSnapshotRecord['manifest'],
+    contextText: row.contextText,
+    sourceFingerprint: parseSourceFingerprint(row.sourceFingerprint),
+    executionFingerprint: row.executionFingerprint,
+    promptVersion: row.promptVersion,
+    createdAt: parseUtcDateTime(row.createdAt),
+  };
+}
+
+function mapArtifact(row: typeof runArtifacts.$inferSelect): RunArtifactRecord {
+  return {
+    id: parseStableId(row.id),
+    runId: parseStableId(row.runId),
+    kind: row.kind,
+    revision: row.revision,
+    content: row.content,
+    contentHash: parseContentHash(row.contentHash),
+    complete: row.complete,
+    createdAt: parseUtcDateTime(row.createdAt),
+  };
+}
+
+function mapModelCallInsert(call: ModelCallRecord) {
+  return {
+    id: call.id,
+    runId: call.runId,
+    stepId: call.stepId,
+    provider: call.provider,
+    model: call.model,
+    status: call.status,
+    inputTokens: call.inputTokens,
+    outputTokens: call.outputTokens,
+    usageKind: call.usageKind,
+    errorJson: stringifyNullableJson(call.error),
+    createdAt: call.createdAt,
+    completedAt: call.completedAt,
+  };
+}
+
+function mapModelCall(row: typeof modelCalls.$inferSelect): ModelCallRecord {
+  return {
+    id: parseStableId(row.id),
+    runId: parseStableId(row.runId),
+    stepId: parseStableId(row.stepId),
+    provider: row.provider,
+    model: row.model,
+    status: row.status,
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    usageKind: row.usageKind,
+    error: parseNullableJson(row.errorJson),
+    createdAt: parseUtcDateTime(row.createdAt),
+    completedAt: row.completedAt === null ? null : parseUtcDateTime(row.completedAt),
+  };
+}
+
+function mapLease(row: typeof bookLeases.$inferSelect): BookLeaseRecord {
+  return {
+    bookId: parseStableId(row.bookId),
+    ownerId: parseStableId(row.ownerId),
+    expiresAt: parseUtcDateTime(row.expiresAt),
+    heartbeatAt: parseUtcDateTime(row.heartbeatAt),
+  };
 }
 
 function mapCommandReceipt(row: typeof commandReceipts.$inferSelect): CommandReceiptRecord {

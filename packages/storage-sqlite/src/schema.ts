@@ -25,6 +25,21 @@ export const outboxJobStatuses = ['pending', 'processing', 'completed', 'failed'
 export const planNodeKinds = ['book', 'volume', 'arc', 'chapter'] as const;
 export const planNodeStatuses = ['confirmed', 'superseded'] as const;
 export const draftCreatedByValues = ['author', 'restore', 'import', 'agent'] as const;
+export const runStepStatuses = ['pending', 'running', 'completed', 'failed', 'unknown'] as const;
+export const modelCallStatuses = [
+  'reserved',
+  'dispatched',
+  'completed',
+  'failed',
+  'unknown',
+] as const;
+export const runArtifactKinds = [
+  'proposal',
+  'draft_candidate',
+  'review',
+  'revision_candidate',
+] as const;
+export const usageKinds = ['reported', 'estimated', 'unknown'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -166,12 +181,105 @@ export const runs = sqliteTable(
   (table) => [index('runs_book_status_idx').on(table.bookId, table.status)],
 );
 
+export const runSteps = sqliteTable(
+  'run_steps',
+  {
+    id: text('id').primaryKey(),
+    runId: text('run_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    name: text('name').notNull(),
+    status: text('status', { enum: runStepStatuses }).notNull(),
+    attempt: integer('attempt').notNull().default(0),
+    inputSnapshotId: text('input_snapshot_id'),
+    artifactId: text('artifact_id'),
+    errorJson: text('error_json'),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    unique('run_steps_run_sequence_unique').on(table.runId, table.sequence),
+    index('run_steps_run_sequence_idx').on(table.runId, table.sequence),
+  ],
+);
+
+export const runEvents = sqliteTable(
+  'run_events',
+  {
+    runId: text('run_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    eventType: text('event_type').notNull(),
+    payloadJson: text('payload_json').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.runId, table.sequence] })],
+);
+
+export const inputSnapshots = sqliteTable('input_snapshots', {
+  id: text('id').primaryKey(),
+  bookId: text('book_id').notNull(),
+  manifestJson: text('manifest_json').notNull(),
+  contextText: text('context_text').notNull(),
+  sourceFingerprint: text('source_fingerprint').notNull(),
+  executionFingerprint: text('execution_fingerprint').notNull(),
+  promptVersion: text('prompt_version').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const runArtifacts = sqliteTable(
+  'run_artifacts',
+  {
+    id: text('id').primaryKey(),
+    runId: text('run_id').notNull(),
+    kind: text('kind', { enum: runArtifactKinds }).notNull(),
+    revision: integer('revision').notNull(),
+    content: text('content').notNull(),
+    contentHash: text('content_hash').notNull(),
+    complete: integer('complete', { mode: 'boolean' }).notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('run_artifacts_run_revision_idx').on(table.runId, table.revision)],
+);
+
+export const modelCalls = sqliteTable(
+  'model_calls',
+  {
+    id: text('id').primaryKey(),
+    runId: text('run_id').notNull(),
+    stepId: text('step_id').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    status: text('status', { enum: modelCallStatuses }).notNull(),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    usageKind: text('usage_kind', { enum: usageKinds }).notNull(),
+    errorJson: text('error_json'),
+    createdAt: text('created_at').notNull(),
+    completedAt: text('completed_at'),
+  },
+  (table) => [index('model_calls_run_created_idx').on(table.runId, table.createdAt)],
+);
+
+export const bookLeases = sqliteTable('book_leases', {
+  bookId: text('book_id').primaryKey(),
+  ownerId: text('owner_id').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  heartbeatAt: text('heartbeat_at').notNull(),
+});
+
 export const schema = {
   books,
   planNodes,
   planNodeVersions,
   chapters,
   draftVersions,
+  runSteps,
+  runEvents,
+  inputSnapshots,
+  runArtifacts,
+  modelCalls,
+  bookLeases,
   commandReceipts,
   outboxJobs,
   runs,
