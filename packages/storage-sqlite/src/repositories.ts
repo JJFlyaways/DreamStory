@@ -961,6 +961,16 @@ export class SqliteRunRepository implements RunPersistenceRepository {
     return row === undefined ? null : mapModelCall(row);
   }
 
+  async listModelCalls(runId: StableId): Promise<readonly ModelCallRecord[]> {
+    return this.database
+      .select()
+      .from(modelCalls)
+      .where(eq(modelCalls.runId, runId))
+      .orderBy(desc(modelCalls.createdAt))
+      .all()
+      .map(mapModelCall);
+  }
+
   async acquireLease(lease: BookLeaseRecord): Promise<boolean> {
     return this.database.transaction((tx) => {
       const current = tx.select().from(bookLeases).where(eq(bookLeases.bookId, lease.bookId)).get();

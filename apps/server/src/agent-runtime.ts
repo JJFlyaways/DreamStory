@@ -76,7 +76,13 @@ export class AgentRuntime {
       bookId,
       ownerId,
       intent: input.intent,
-      scope: input.scope,
+      scope: mergeRunScope(input.scope, {
+        modelProfileId: input.modelProfileId,
+        targetPlanId: input.targetPlanId,
+        ...(input.targetChapterNumber === undefined
+          ? {}
+          : { targetChapterNumber: input.targetChapterNumber }),
+      }),
       inputSnapshot: {
         id: parseStableId(`snapshot_${runId}`),
         bookId,
@@ -102,6 +108,49 @@ export class AgentRuntime {
       eventHub: coordinator.eventHub,
     });
     void coordinator.execute(runId);
+    return run;
+  }
+
+  async resume(
+    bookId: StableId,
+    runId: StableId,
+    expectedBookRevision: number,
+    retryUnknownModelCall: boolean,
+  ): Promise<RunRecord> {
+    const book = await this.projects.getBook(bookId);
+    if (book === null) throw new Error('The book does not exist.');
+    if (book.bookRevision !== expectedBookRevision)
+      throw new Error('The book revision has changed.');
+    const repository = await this.projects.runRepository(bookId);
+    const run = await repository.get(runId);
+    if (run === null) throw new Error('The run does not exist.');
+    const snapshot = run.inputSnapshotId
+      ? await repository.getInputSnapshot(run.inputSnapshotId)
+      : null;
+    if (snapshot === null) throw new Error('The run input snapshot is missing.');
+    const scope = isRecord(run.scope) ? run.scope : {};
+    const modelProfileId = parseStableId(
+      requiredScopeString(scope['modelProfileId'], 'modelProfileId'),
+    );
+    const profile = this.config.modelProfiles.find((item) => item.id === modelProfileId);
+    if (profile === undefined) throw new Error(`Model profile not found: ${modelProfileId}`);
+    const coordinator = new AgentRunCoordinator(repository);
+    const command = {
+      runId,
+      bookId,
+      ownerId: parseStableId(`worker_${randomUUID()}`),
+      intent: run.intent,
+      scope: run.scope,
+      inputSnapshot: snapshot,
+      provider: createProvider(profile),
+      providerName: profile.protocol,
+      model: profile.model,
+      modelInput: snapshot.contextText,
+      now: nowUtc(),
+      snapshotEveryCharacters: 120,
+    } as const;
+    this.handles.set(runId, { bookId, repository, coordinator, eventHub: coordinator.eventHub });
+    void coordinator.resume(command, retryUnknownModelCall);
     return run;
   }
 
@@ -165,4 +214,18 @@ function intentRole(intent: string): 'planner' | 'writer' | 'reviewer' {
 
 function nowUtc(): IsoUtcDateTime {
   return parseUtcDateTime(new Date().toISOString());
+}
+
+function mergeRunScope(scope: unknown, additions: Record<string, unknown>): unknown {
+  return { ...(isRecord(scope) ? scope : {}), ...additions };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function requiredScopeString(value: unknown, name: string): string {
+  if (typeof value !== 'string' || value.trim() === '')
+    throw new Error(`${name} is missing from run scope.`);
+  return value;
 }

@@ -546,6 +546,25 @@ export function createServer(
     },
   );
 
+  app.post<{ Params: { bookId: string; runId: string } }>(
+    '/api/v1/books/:bookId/runs/:runId/resume',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) return;
+      try {
+        const body = parseRunResumeBody(request.body);
+        const run = await agentRuntime.resume(
+          parseBookId(request.params.bookId),
+          parseStableId(request.params.runId),
+          body.expectedBookRevision,
+          body.retryUnknownModelCall,
+        );
+        return { data: run };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
   app.get<{ Params: { bookId: string; runId: string } }>(
     '/api/v1/books/:bookId/runs/:runId/events',
     async (request, reply) => {
@@ -1196,6 +1215,22 @@ function parseRunStartBody(value: unknown): StartAgentRunInput {
     ...(chapterNumber === undefined ? {} : { targetChapterNumber: chapterNumber }),
     modelProfileId: parseStableId(requiredString(record['modelProfileId'])),
     scope: record['scope'] ?? {},
+  };
+}
+
+function parseRunResumeBody(value: unknown): {
+  expectedBookRevision: BookRevision;
+  retryUnknownModelCall: boolean;
+} {
+  const record = asRecord(value);
+  const retry = record['retryUnknownModelCall'] ?? false;
+  if (typeof retry !== 'boolean') throw new Error('retryUnknownModelCall must be a boolean.');
+  return {
+    expectedBookRevision: parsePositiveInteger(
+      record['expectedBookRevision'],
+      'expectedBookRevision',
+    ),
+    retryUnknownModelCall: retry,
   };
 }
 

@@ -125,6 +125,7 @@ export interface RunPersistenceRepository {
   reserveModelCall(call: ModelCallRecord): Promise<void>;
   updateModelCall(id: StableId, changes: Partial<ModelCallRecord>): Promise<void>;
   getModelCall(id: StableId): Promise<ModelCallRecord | null>;
+  listModelCalls(runId: StableId): Promise<readonly ModelCallRecord[]>;
   acquireLease(lease: BookLeaseRecord): Promise<boolean>;
   heartbeatLease(
     bookId: StableId,

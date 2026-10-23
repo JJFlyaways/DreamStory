@@ -103,3 +103,36 @@ test('cancels a streaming run and preserves the partial candidate', async () => 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('resumes a failed run from persisted steps with a fresh coordinator', async () => {
+  const directory = await createDirectory();
+  try {
+    const initialized = await initializeProjectDatabase(directory);
+    const failedProvider = new FakeModelProvider({ chunks: ['不会保存'], failAfterChunks: 0 });
+    const firstCoordinator = new AgentRunCoordinator(
+      initialized.repositories.runs,
+      undefined,
+      () => timestamp,
+    );
+    const runCommand = command(failedProvider, 'run_runner_resume');
+    const failed = await firstCoordinator.run(runCommand);
+    assert.equal(failed.status, 'failed');
+
+    const resumedProvider = new FakeModelProvider({ chunks: ['恢复后的候选'] });
+    const secondCoordinator = new AgentRunCoordinator(
+      initialized.repositories.runs,
+      undefined,
+      () => timestamp,
+    );
+    await secondCoordinator.resume(command(resumedProvider, 'run_runner_resume'), true);
+    const resumed = await initialized.repositories.runs.get('run_runner_resume');
+    assert.equal(resumed.status, 'awaiting_author');
+    assert.equal(
+      (await initialized.repositories.runs.listArtifacts('run_runner_resume'))[0].content,
+      '恢复后的候选',
+    );
+    initialized.connection.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

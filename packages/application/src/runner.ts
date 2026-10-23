@@ -129,6 +129,37 @@ export class AgentRunCoordinator {
     return result;
   }
 
+  async resume(command: AgentRunCommand, retryUnknownModelCall: boolean): Promise<void> {
+    const run = await this.runs.get(command.runId);
+    if (run === null) throw new Error('Run does not exist.');
+    if (
+      run.status === 'awaiting_author' ||
+      run.status === 'completed' ||
+      run.status === 'cancelled'
+    ) {
+      throw new Error(`Run cannot be resumed from ${run.status}.`);
+    }
+    const calls = await this.runs.listModelCalls(command.runId);
+    const uncertain = calls.some(
+      (call) => call.status === 'dispatched' || call.status === 'unknown',
+    );
+    if (uncertain && !retryUnknownModelCall) {
+      throw new Error('A model call has unknown delivery state; explicit retry is required.');
+    }
+    const steps = await this.runs.listSteps(command.runId);
+    for (const step of steps) {
+      if (step.status !== 'completed') {
+        await this.runs.updateStep(step.id, {
+          status: 'pending',
+          error: null,
+          updatedAt: command.now,
+        });
+      }
+    }
+    this.commands.set(command.runId, command);
+    await this.execute(command.runId);
+  }
+
   async execute(runId: StableId): Promise<void> {
     const command = this.commands.get(runId);
     if (command === undefined) throw new Error(`Run command is not available: ${runId}`);
@@ -151,6 +182,7 @@ export class AgentRunCoordinator {
     const steps = await this.runs.listSteps(runId);
     try {
       for (const step of steps) {
+        if (step.status === 'completed') continue;
         if (this.cancelRequests.has(runId)) {
           await this.finishCancelled(command, step);
           return;
@@ -223,6 +255,7 @@ export class AgentRunCoordinator {
       createdAt: startedAt,
       completedAt: null,
     });
+    await this.runs.updateModelCall(callId, { status: 'dispatched' });
 
     const chunks: string[] = [];
     let artifactRevision = 0;
