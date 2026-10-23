@@ -88,8 +88,15 @@ test('cancels a streaming run and preserves the partial candidate', async () => 
     );
     const runCommand = command(provider, 'run_runner_cancel');
     await coordinator.start(runCommand);
+    const firstOutput = new Promise((resolve) => {
+      const unsubscribe = coordinator.eventHub.subscribe(runCommand.runId, (event) => {
+        if (event.event !== 'output.delta') return;
+        unsubscribe();
+        resolve();
+      });
+    });
     const execution = coordinator.execute(runCommand.runId);
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 8));
+    await firstOutput;
     coordinator.cancel(runCommand.runId);
     await execution;
 
