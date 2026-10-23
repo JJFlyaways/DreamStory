@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Threaded DS lockup exploration</title>
+  <g id="symbol" transform="translate(0 0)">
+    <path fill="#111111" fill-rule="evenodd" d="M40 28 H104 C172 28 220 68 220 128 C220 188 172 228 104 228 H40 Z M88 76 H104 C142 76 168 95 168 128 C168 161 142 180 104 180 H88 Z"/>
+    <path d="M174 70 C150 52 113 50 87 67 C64 82 64 108 88 122 C103 131 125 130 144 134 C160 137 169 146 169 158 C169 172 153 184 136 189 C112 195 89 187 72 173" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  </g>
+  <!-- Provisional exploration wordmark; outline the wordmark in the final kit. -->
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

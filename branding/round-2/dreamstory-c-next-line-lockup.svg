@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Next Line lockup exploration</title>
+  <g id="symbol">
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84" fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

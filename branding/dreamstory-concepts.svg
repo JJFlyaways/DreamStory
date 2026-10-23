@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="984" viewBox="0 0 1600 984"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="984" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">DreamStory · logo concepts</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">First round · monochrome exploration</text><rect x="60" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-title">DreamStory — Threaded DS concept</title>
+  <g id="c0-symbol">
+    <!-- A D-shaped frame: 48-unit stem, 64-unit inner bowl, 56-unit outer radius. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M40 28 H104 C172 28 220 68 220 128 C220 188 172 228 104 228 H40 Z
+      M88 76 H104 C142 76 168 95 168 128 C168 161 142 180 104 180 H88 Z"/>
+    <!-- Exploration knockout: a single S-like story thread passing through the D. -->
+    <path d="M174 70 C150 52 113 50 87 67 C64 82 64 108 88 122 C103 131 125 130 144 134 C160 137 169 146 169 158 C169 172 153 184 136 189 C112 195 89 187 72 173"
+      fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 920 256" x="90" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l0-title">DreamStory — Threaded DS lockup exploration</title>
+  <g id="l0-symbol" transform="translate(0 0)">
+    <path fill="#111111" fill-rule="evenodd" d="M40 28 H104 C172 28 220 68 220 128 C220 188 172 228 104 228 H40 Z M88 76 H104 C142 76 168 95 168 128 C168 161 142 180 104 180 H88 Z"/>
+    <path d="M174 70 C150 52 113 50 87 67 C64 82 64 108 88 122 C103 131 125 130 144 134 C160 137 169 146 169 158 C169 172 153 184 136 189 C112 195 89 187 72 173" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  </g>
+  <!-- Provisional exploration wordmark; outline the wordmark in the final kit. -->
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="90" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-title">DreamStory — Threaded DS concept</title>
+  <g id="s064-symbol">
+    <!-- A D-shaped frame: 48-unit stem, 64-unit inner bowl, 56-unit outer radius. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M40 28 H104 C172 28 220 68 220 128 C220 188 172 228 104 228 H40 Z
+      M88 76 H104 C142 76 168 95 168 128 C168 161 142 180 104 180 H88 Z"/>
+    <!-- Exploration knockout: a single S-like story thread passing through the D. -->
+    <path d="M174 70 C150 52 113 50 87 67 C64 82 64 108 88 122 C103 131 125 130 144 134 C160 137 169 146 169 158 C169 172 153 184 136 189 C112 195 89 187 72 173"
+      fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="122" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="180" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-title">DreamStory — Threaded DS concept</title>
+  <g id="s032-symbol">
+    <!-- A D-shaped frame: 48-unit stem, 64-unit inner bowl, 56-unit outer radius. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M40 28 H104 C172 28 220 68 220 128 C220 188 172 228 104 228 H40 Z
+      M88 76 H104 C142 76 168 95 168 128 C168 161 142 180 104 180 H88 Z"/>
+    <!-- Exploration knockout: a single S-like story thread passing through the D. -->
+    <path d="M174 70 C150 52 113 50 87 67 C64 82 64 108 88 122 C103 131 125 130 144 134 C160 137 169 146 169 158 C169 172 153 184 136 189 C112 195 89 187 72 173"
+      fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="196" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="238" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-title">DreamStory — Threaded DS concept</title>
+  <g id="s016-symbol">
+    <!-- A D-shaped frame: 48-unit stem, 64-unit inner bowl, 56-unit outer radius. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M40 28 H104 C172 28 220 68 220 128 C220 188 172 228 104 228 H40 Z
+      M88 76 H104 C142 76 168 95 168 128 C168 161 142 180 104 180 H88 Z"/>
+    <!-- Exploration knockout: a single S-like story thread passing through the D. -->
+    <path d="M174 70 C150 52 113 50 87 67 C64 82 64 108 88 122 C103 131 125 130 144 134 C160 137 169 146 169 158 C169 172 153 184 136 189 C112 195 89 187 72 173"
+      fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="246" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · A · Threaded DS</text><text x="90.0" y="808" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="842" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">D 形外框被一条连续 S 形故事线穿过。</text><rect x="562.667" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-title">DreamStory — Quiet Orbit concept</title>
+  <g id="c1-symbol">
+    <!-- A broken circular path: the story stays open while the core remains steady. -->
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 920 256" x="592.667" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l1-title">DreamStory — Quiet Orbit lockup exploration</title>
+  <g id="l1-symbol">
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+  <!-- Provisional exploration wordmark; outline the wordmark in the final kit. -->
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="592.667" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-title">DreamStory — Quiet Orbit concept</title>
+  <g id="s164-symbol">
+    <!-- A broken circular path: the story stays open while the core remains steady. -->
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+</svg>
+</g><text x="624.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="682.667" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-title">DreamStory — Quiet Orbit concept</title>
+  <g id="s132-symbol">
+    <!-- A broken circular path: the story stays open while the core remains steady. -->
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+</svg>
+</g><text x="698.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="740.667" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-title">DreamStory — Quiet Orbit concept</title>
+  <g id="s116-symbol">
+    <!-- A broken circular path: the story stays open while the core remains steady. -->
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+</svg>
+</g><text x="748.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · B · Quiet Orbit</text><text x="592.6666666666667" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">开放的环绕路径守住一个稳定的故事核心。</text><rect x="1065.33" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c2-title">DreamStory — Story Seed concept</title>
+  <g id="c2-symbol">
+    <!-- A reduced seed silhouette, split by two quiet openings into branching threads. -->
+    <path fill="#111111" d="M128 24 C95 56 64 92 64 142 C64 193 91 228 128 228 C165 228 192 193 192 142 C192 92 161 56 128 24 Z"/>
+    <path d="M128 78 C113 101 105 120 105 142 C105 165 114 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <path d="M128 78 C143 101 151 120 151 142 C151 165 142 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 920 256" x="1095.33" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l2-title">DreamStory — Story Seed lockup exploration</title>
+  <g id="l2-symbol">
+    <path fill="#111111" d="M128 24 C95 56 64 92 64 142 C64 193 91 228 128 228 C165 228 192 193 192 142 C192 92 161 56 128 24 Z"/>
+    <path d="M128 78 C113 101 105 120 105 142 C105 165 114 181 128 191" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <path d="M128 78 C143 101 151 120 151 142 C151 165 142 181 128 191" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  </g>
+  <!-- Provisional exploration wordmark; outline the wordmark in the final kit. -->
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1095.33" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s264-title">DreamStory — Story Seed concept</title>
+  <g id="s264-symbol">
+    <!-- A reduced seed silhouette, split by two quiet openings into branching threads. -->
+    <path fill="#111111" d="M128 24 C95 56 64 92 64 142 C64 193 91 228 128 228 C165 228 192 193 192 142 C192 92 161 56 128 24 Z"/>
+    <path d="M128 78 C113 101 105 120 105 142 C105 165 114 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <path d="M128 78 C143 101 151 120 151 142 C151 165 142 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="1127.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1185.33" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s232-title">DreamStory — Story Seed concept</title>
+  <g id="s232-symbol">
+    <!-- A reduced seed silhouette, split by two quiet openings into branching threads. -->
+    <path fill="#111111" d="M128 24 C95 56 64 92 64 142 C64 193 91 228 128 228 C165 228 192 193 192 142 C192 92 161 56 128 24 Z"/>
+    <path d="M128 78 C113 101 105 120 105 142 C105 165 114 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <path d="M128 78 C143 101 151 120 151 142 C151 165 142 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="1201.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1243.33" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s216-title">DreamStory — Story Seed concept</title>
+  <g id="s216-symbol">
+    <!-- A reduced seed silhouette, split by two quiet openings into branching threads. -->
+    <path fill="#111111" d="M128 24 C95 56 64 92 64 142 C64 193 91 228 128 228 C165 228 192 193 192 142 C192 92 161 56 128 24 Z"/>
+    <path d="M128 78 C113 101 105 120 105 142 C105 165 114 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <path d="M128 78 C143 101 151 120 151 142 C151 165 142 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="1251.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · C · Story Seed</text><text x="1095.3333333333335" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">一个故事种子向内外分出两条叙事线。</text></svg>

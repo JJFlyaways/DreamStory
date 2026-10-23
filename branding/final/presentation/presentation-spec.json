@@ -1,0 +1,34 @@
+{
+  "brand": "DreamStory",
+  "tagline": "本地优先的 AI 小说创作工作台",
+  "brief": "DreamStory helps authors plan stories, manage world-building, write chapters, and maintain long-term continuity in a calm local-first workspace.",
+  "adjectives": ["literary", "calm", "imaginative", "dependable"],
+  "industry": "software",
+  "mockups": ["readme", "app-icon", "website", "terminal", "sticker", "social"],
+  "nav": ["作品", "章节", "设定", "版本"],
+  "brand_color": "#6BC8C1",
+  "tile_color": "#6BC8C1",
+  "greyscale": false,
+  "final": true,
+  "round": 3,
+  "concepts": [
+    {
+      "name": "Book & Quote",
+      "symbol": "../source/dreamstory-symbol-color.svg",
+      "lockup": "../source/dreamstory-logo-horizontal-color.svg",
+      "stacked": "../source/dreamstory-logo-stacked-color.svg",
+      "avatar": "../digital/dreamstory-symbol-app-icon.svg",
+      "symbol_on_tile": "../source/dreamstory-symbol-color.svg",
+      "symbol_on_dark": "../source/dreamstory-symbol-dark.svg",
+      "lockup_on_dark": "../source/dreamstory-logo-horizontal-dark.svg",
+      "stacked_on_tile": "../source/dreamstory-logo-stacked-color.svg",
+      "idea": "A hardcover silhouette, page field, and custom quotation mark make the connection to books and novel writing immediate.",
+      "rationale": [
+        "The book is the first-read shape, so the product category does not depend on an abstract explanation.",
+        "The quotation mark turns a generic book into a novel-writing identity.",
+        "The compact page field and clear spine provide a stable app-icon and favicon silhouette."
+      ]
+    }
+  ],
+  "recommendation": "Use the horizontal color lockup as the primary signature, the symbol alone for the app/PWA, and the reversed/dark versions on the existing ink UI."
+}

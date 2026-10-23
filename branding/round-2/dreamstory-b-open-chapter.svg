@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Open Chapter concept</title>
+  <g id="symbol">
+    <!-- Two simple chapter pages leave a deliberate gutter for the story line. -->
+    <path fill="#111111" d="M28 58 A22 22 0 0 1 50 36 H116 V220 H50 A22 22 0 0 1 28 198 Z"/>
+    <path fill="#111111" d="M140 36 H206 A22 22 0 0 1 228 58 V198 A22 22 0 0 1 206 220 H140 Z"/>
+    <!-- Prose lines keep the book reference legible; the centre line becomes the story arc. -->
+    <path d="M54 96 H98 M54 126 H102 M158 96 H202 M158 126 H206" fill="none" stroke="#FFFFFF"
+      stroke-width="14" stroke-linecap="round"/>
+    <path d="M54 170 C78 170 96 183 116 183 C139 183 150 152 164 136 C175 123 190 116 206 116"
+      fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

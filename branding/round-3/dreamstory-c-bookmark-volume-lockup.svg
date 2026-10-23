@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Bookmark Volume lockup exploration</title>
+  <g id="symbol">
+    <path fill="#111111" d="M36 36 H220 V220 H36 Z"/>
+    <path fill="#FFFFFF" d="M72 60 H196 V196 H72 Z"/>
+    <path fill="#111111" d="M142 44 H178 V144 L160 128 L142 144 Z"/>
+    <path d="M88 92 H126 M88 124 H126 M88 156 H126" fill="none" stroke="#111111" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

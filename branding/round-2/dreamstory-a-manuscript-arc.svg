@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Manuscript Arc concept</title>
+  <g id="symbol">
+    <!-- A manuscript page with a folded corner, built on a 24-unit grid. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z
+      M156 28 V92 H220 Z"/>
+    <!-- Two lines of prose and one line that rises into a narrative arc. -->
+    <path d="M62 108 H184" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none"
+      stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

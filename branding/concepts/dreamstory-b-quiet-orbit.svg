@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Quiet Orbit concept</title>
+  <g id="symbol">
+    <!-- A broken circular path: the story stays open while the core remains steady. -->
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+</svg>

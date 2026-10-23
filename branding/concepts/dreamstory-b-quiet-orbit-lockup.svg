@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Quiet Orbit lockup exploration</title>
+  <g id="symbol">
+    <path d="M193 63 A92 92 0 1 0 63 193" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="17" fill="#111111"/>
+  </g>
+  <!-- Provisional exploration wordmark; outline the wordmark in the final kit. -->
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>

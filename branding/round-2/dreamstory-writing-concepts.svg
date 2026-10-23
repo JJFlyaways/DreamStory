@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="984" viewBox="0 0 1600 984"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="984" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">DreamStory · writing-first logo concepts</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Second round · writing relationship made visible</text><rect x="60" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-title">DreamStory — Manuscript Arc concept</title>
+  <g id="c0-symbol">
+    <!-- A manuscript page with a folded corner, built on a 24-unit grid. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z
+      M156 28 V92 H220 Z"/>
+    <!-- Two lines of prose and one line that rises into a narrative arc. -->
+    <path d="M62 108 H184" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none"
+      stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 920 256" x="90" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l0-title">DreamStory — Manuscript Arc lockup exploration</title>
+  <g id="l0-symbol">
+    <path fill="#111111" fill-rule="evenodd" d="M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z M156 28 V92 H220 Z"/>
+    <path d="M62 108 H184 M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="90" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-title">DreamStory — Manuscript Arc concept</title>
+  <g id="s064-symbol">
+    <!-- A manuscript page with a folded corner, built on a 24-unit grid. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z
+      M156 28 V92 H220 Z"/>
+    <!-- Two lines of prose and one line that rises into a narrative arc. -->
+    <path d="M62 108 H184" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none"
+      stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><text x="122" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="180" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-title">DreamStory — Manuscript Arc concept</title>
+  <g id="s032-symbol">
+    <!-- A manuscript page with a folded corner, built on a 24-unit grid. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z
+      M156 28 V92 H220 Z"/>
+    <!-- Two lines of prose and one line that rises into a narrative arc. -->
+    <path d="M62 108 H184" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none"
+      stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><text x="196" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="238" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-title">DreamStory — Manuscript Arc concept</title>
+  <g id="s016-symbol">
+    <!-- A manuscript page with a folded corner, built on a 24-unit grid. -->
+    <path fill="#111111" fill-rule="evenodd" d="
+      M52 28 H220 V204 A24 24 0 0 1 196 228 H52 A24 24 0 0 1 28 204 V52 A24 24 0 0 1 52 28 Z
+      M156 28 V92 H220 Z"/>
+    <!-- Two lines of prose and one line that rises into a narrative arc. -->
+    <path d="M62 108 H184" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 140 H166" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M62 174 H96 C117 174 128 162 140 150 C152 138 166 130 188 130" fill="none"
+      stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><text x="246" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · A · Manuscript Arc</text><text x="90.0" y="808" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="842" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">稿纸中的文字行，在最后一行升成故事弧线。</text><rect x="562.667" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-title">DreamStory — Open Chapter concept</title>
+  <g id="c1-symbol">
+    <!-- Two simple chapter pages leave a deliberate gutter for the story line. -->
+    <path fill="#111111" d="M28 58 A22 22 0 0 1 50 36 H116 V220 H50 A22 22 0 0 1 28 198 Z"/>
+    <path fill="#111111" d="M140 36 H206 A22 22 0 0 1 228 58 V198 A22 22 0 0 1 206 220 H140 Z"/>
+    <!-- Prose lines keep the book reference legible; the centre line becomes the story arc. -->
+    <path d="M54 96 H98 M54 126 H102 M158 96 H202 M158 126 H206" fill="none" stroke="#FFFFFF"
+      stroke-width="14" stroke-linecap="round"/>
+    <path d="M54 170 C78 170 96 183 116 183 C139 183 150 152 164 136 C175 123 190 116 206 116"
+      fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 920 256" x="592.667" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l1-title">DreamStory — Open Chapter lockup exploration</title>
+  <g id="l1-symbol">
+    <path fill="#111111" d="M28 58 A22 22 0 0 1 50 36 H116 V220 H50 A22 22 0 0 1 28 198 Z"/>
+    <path fill="#111111" d="M140 36 H206 A22 22 0 0 1 228 58 V198 A22 22 0 0 1 206 220 H140 Z"/>
+    <path d="M54 96 H98 M54 126 H102 M158 96 H202 M158 126 H206" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M54 170 C78 170 96 183 116 183 C139 183 150 152 164 136 C175 123 190 116 206 116" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="592.667" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-title">DreamStory — Open Chapter concept</title>
+  <g id="s164-symbol">
+    <!-- Two simple chapter pages leave a deliberate gutter for the story line. -->
+    <path fill="#111111" d="M28 58 A22 22 0 0 1 50 36 H116 V220 H50 A22 22 0 0 1 28 198 Z"/>
+    <path fill="#111111" d="M140 36 H206 A22 22 0 0 1 228 58 V198 A22 22 0 0 1 206 220 H140 Z"/>
+    <!-- Prose lines keep the book reference legible; the centre line becomes the story arc. -->
+    <path d="M54 96 H98 M54 126 H102 M158 96 H202 M158 126 H206" fill="none" stroke="#FFFFFF"
+      stroke-width="14" stroke-linecap="round"/>
+    <path d="M54 170 C78 170 96 183 116 183 C139 183 150 152 164 136 C175 123 190 116 206 116"
+      fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><text x="624.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="682.667" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-title">DreamStory — Open Chapter concept</title>
+  <g id="s132-symbol">
+    <!-- Two simple chapter pages leave a deliberate gutter for the story line. -->
+    <path fill="#111111" d="M28 58 A22 22 0 0 1 50 36 H116 V220 H50 A22 22 0 0 1 28 198 Z"/>
+    <path fill="#111111" d="M140 36 H206 A22 22 0 0 1 228 58 V198 A22 22 0 0 1 206 220 H140 Z"/>
+    <!-- Prose lines keep the book reference legible; the centre line becomes the story arc. -->
+    <path d="M54 96 H98 M54 126 H102 M158 96 H202 M158 126 H206" fill="none" stroke="#FFFFFF"
+      stroke-width="14" stroke-linecap="round"/>
+    <path d="M54 170 C78 170 96 183 116 183 C139 183 150 152 164 136 C175 123 190 116 206 116"
+      fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><text x="698.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="740.667" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-title">DreamStory — Open Chapter concept</title>
+  <g id="s116-symbol">
+    <!-- Two simple chapter pages leave a deliberate gutter for the story line. -->
+    <path fill="#111111" d="M28 58 A22 22 0 0 1 50 36 H116 V220 H50 A22 22 0 0 1 28 198 Z"/>
+    <path fill="#111111" d="M140 36 H206 A22 22 0 0 1 228 58 V198 A22 22 0 0 1 206 220 H140 Z"/>
+    <!-- Prose lines keep the book reference legible; the centre line becomes the story arc. -->
+    <path d="M54 96 H98 M54 126 H102 M158 96 H202 M158 126 H206" fill="none" stroke="#FFFFFF"
+      stroke-width="14" stroke-linecap="round"/>
+    <path d="M54 170 C78 170 96 183 116 183 C139 183 150 152 164 136 C175 123 190 116 206 116"
+      fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
+</g><text x="748.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · B · Open Chapter</text><text x="592.6666666666667" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">两页章节之间穿过一条连续的叙事线。</text><rect x="1065.33" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c2-title">DreamStory — Next Line concept</title>
+  <g id="c2-symbol">
+    <!-- A writing cursor marks the next sentence; the line beside it becomes the plot arc. -->
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84"
+      fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 920 256" x="1095.33" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l2-title">DreamStory — Next Line lockup exploration</title>
+  <g id="l2-symbol">
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84" fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <text x="278" y="158" fill="#111111" font-family="Georgia, 'Songti SC', serif" font-size="72" letter-spacing="-2">DreamStory</text>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1095.33" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s264-title">DreamStory — Next Line concept</title>
+  <g id="s264-symbol">
+    <!-- A writing cursor marks the next sentence; the line beside it becomes the plot arc. -->
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84"
+      fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="1127.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1185.33" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s232-title">DreamStory — Next Line concept</title>
+  <g id="s232-symbol">
+    <!-- A writing cursor marks the next sentence; the line beside it becomes the plot arc. -->
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84"
+      fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="1201.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 256 256" x="1243.33" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s216-title">DreamStory — Next Line concept</title>
+  <g id="s216-symbol">
+    <!-- A writing cursor marks the next sentence; the line beside it becomes the plot arc. -->
+    <rect x="192" y="48" width="20" height="80" rx="4" fill="#111111"/>
+    <path d="M36 170 H78 C102 170 116 160 128 141 C142 119 153 94 175 84"
+      fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 204 H112" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>
+</g><text x="1251.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · C · Next Line</text><text x="1095.3333333333335" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">编辑器光标标记下一句，文字线变成情节弧线。</text></svg>

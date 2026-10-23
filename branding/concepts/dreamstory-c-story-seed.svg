@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">DreamStory — Story Seed concept</title>
+  <g id="symbol">
+    <!-- A reduced seed silhouette, split by two quiet openings into branching threads. -->
+    <path fill="#111111" d="M128 24 C95 56 64 92 64 142 C64 193 91 228 128 228 C165 228 192 193 192 142 C192 92 161 56 128 24 Z"/>
+    <path d="M128 78 C113 101 105 120 105 142 C105 165 114 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <path d="M128 78 C143 101 151 120 151 142 C151 165 142 181 128 191"
+      fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  </g>
+</svg>
