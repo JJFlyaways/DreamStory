@@ -231,6 +231,9 @@ importers:
       '@dreamstory/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@dreamstory/model-gateway':
+        specifier: workspace:*
+        version: link:../../packages/model-gateway
       '@dreamstory/storage-sqlite':
         specifier: workspace:*
         version: link:../../packages/storage-sqlite

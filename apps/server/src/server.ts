@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import type { ServerResponse } from 'node:http';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 
@@ -17,9 +18,12 @@ import {
   type BookRecord,
   type PlanNodeCommand,
   type RestoreDraftCommand,
+  type RunEventRecord,
+  type TransientRunEvent,
   type SaveDraftCommand,
   type UpdateBookCommand,
 } from '@dreamstory/application';
+import { AgentRuntime, type StartAgentRunInput } from './agent-runtime.js';
 import {
   CONTRACT_VERSION,
   parseClientRequestId,
@@ -27,6 +31,7 @@ import {
   parseUtcDateTime,
   type BookRevision,
   type ErrorCode,
+  type RunIntent,
   type PlanContent,
   type PlanKind,
   type PlanNodeStatus,
@@ -125,6 +130,11 @@ export class BookProjectManager {
   async getBook(bookId: StableId) {
     const initialized = await this.openBook(bookId);
     return initialized.repositories.books.get(bookId);
+  }
+
+  async runRepository(bookId: StableId) {
+    const initialized = await this.openBook(bookId);
+    return initialized.repositories.runs;
   }
 
   async listBooks(): Promise<readonly BookShelfEntry[]> {
@@ -415,6 +425,7 @@ export function createServer(
     ttlSeconds: config.session.ttlSeconds,
     allowedOrigins: config.listen.allowedOrigins,
   });
+  const agentRuntime = new AgentRuntime(projectManager, config);
 
   app.get('/api/v1/health', async (request) => {
     const query = request.query as { bookId?: string };
@@ -436,6 +447,97 @@ export function createServer(
     reply.header('set-cookie', serializeSessionCookie(issued.cookie));
     return { data: issued.session };
   });
+
+  app.post<{ Params: { bookId: string } }>('/api/v1/books/:bookId/runs', async (request, reply) => {
+    if (!requireWriteSecurity(request, reply, sessions)) return;
+    try {
+      const bookId = parseBookId(request.params.bookId);
+      const input = parseRunStartBody(request.body);
+      const run = await agentRuntime.start(bookId, input);
+      return reply.code(202).send({ data: run });
+    } catch (error) {
+      return sendCommandError(reply, request, error);
+    }
+  });
+
+  app.get<{ Params: { bookId: string } }>('/api/v1/books/:bookId/runs', async (request, reply) => {
+    try {
+      return { data: await agentRuntime.listRuns(parseBookId(request.params.bookId)) };
+    } catch (error) {
+      return sendCommandError(reply, request, error);
+    }
+  });
+
+  app.get<{ Params: { bookId: string; runId: string } }>(
+    '/api/v1/books/:bookId/runs/:runId',
+    async (request, reply) => {
+      try {
+        const run = await agentRuntime.getRun(
+          parseBookId(request.params.bookId),
+          parseStableId(request.params.runId),
+        );
+        if (run === null)
+          return sendError(reply, request, 404, 'NOT_FOUND', 'The run does not exist.');
+        return { data: run };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { bookId: string; runId: string } }>(
+    '/api/v1/books/:bookId/runs/:runId/artifacts',
+    async (request, reply) => {
+      try {
+        return {
+          data: await agentRuntime.listArtifacts(
+            parseBookId(request.params.bookId),
+            parseStableId(request.params.runId),
+          ),
+        };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { bookId: string; runId: string } }>(
+    '/api/v1/books/:bookId/runs/:runId/cancel',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) return;
+      const cancelled = agentRuntime.cancel(parseStableId(request.params.runId));
+      if (!cancelled) return sendError(reply, request, 404, 'NOT_FOUND', 'The run is not active.');
+      return { data: { cancelled: true } };
+    },
+  );
+
+  app.get<{ Params: { bookId: string; runId: string } }>(
+    '/api/v1/books/:bookId/runs/:runId/events',
+    async (request, reply) => {
+      const bookId = parseBookId(request.params.bookId);
+      const runId = parseStableId(request.params.runId);
+      const lastEventId = Number(request.headers['last-event-id'] ?? 0);
+      const persisted = await agentRuntime.listEvents(
+        bookId,
+        runId,
+        Number.isSafeInteger(lastEventId) ? lastEventId : 0,
+      );
+      reply.hijack();
+      const response = reply.raw;
+      response.writeHead(200, {
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+        'content-type': 'text/event-stream',
+      });
+      for (const event of persisted) writeSseEvent(response, event);
+      const unsubscribe = agentRuntime.subscribe(runId, (event) => writeSseEvent(response, event));
+      const heartbeat = globalThis.setInterval(() => response.write(': heartbeat\n\n'), 15_000);
+      request.raw.on('close', () => {
+        globalThis.clearInterval(heartbeat);
+        unsubscribe?.();
+      });
+    },
+  );
 
   app.post<{ Params: { bookId: string } }>(
     '/api/v1/books/:bookId/context/preview',
@@ -973,6 +1075,50 @@ function parseExportFormat(value: unknown): ExportFormat {
   throw new Error('format must be markdown or txt.');
 }
 
+function parseRunStartBody(value: unknown): StartAgentRunInput {
+  const record = asRecord(value);
+  const target = asRecord(record['target']);
+  const intent = parseRunIntent(record['intent']);
+  const targetPlanId = target['planId'] ?? target['planNodeId'];
+  if (targetPlanId === undefined) {
+    throw new Error('target.planId is required to start a run.');
+  }
+  const chapterNumber = target['chapterNumber'];
+  if (
+    chapterNumber !== undefined &&
+    (typeof chapterNumber !== 'number' || !Number.isSafeInteger(chapterNumber) || chapterNumber < 1)
+  ) {
+    throw new Error('target.chapterNumber must be a positive integer.');
+  }
+  return {
+    intent,
+    expectedBookRevision: parsePositiveInteger(
+      record['expectedBookRevision'],
+      'expectedBookRevision',
+    ),
+    targetPlanId: parseStableId(requiredString(targetPlanId)),
+    ...(chapterNumber === undefined ? {} : { targetChapterNumber: chapterNumber }),
+    modelProfileId: parseStableId(requiredString(record['modelProfileId'])),
+    scope: record['scope'] ?? {},
+  };
+}
+
+function parseRunIntent(value: unknown): RunIntent {
+  const intents: readonly RunIntent[] = [
+    'plan_book',
+    'plan_volume',
+    'plan_arc',
+    'plan_chapter',
+    'draft_chapter',
+    'review_chapter',
+    'revise_chapter',
+  ];
+  if (typeof value === 'string' && intents.includes(value as RunIntent)) {
+    return value as RunIntent;
+  }
+  throw new Error('intent is not a supported run type.');
+}
+
 function parseContextPreviewBody(value: unknown): {
   expectedBookRevision: BookRevision;
   command: ContextPreviewCommand;
@@ -1113,6 +1259,16 @@ function nowUtc() {
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error && error.code === code;
+}
+
+function writeSseEvent(response: ServerResponse, event: RunEventRecord | TransientRunEvent): void {
+  if ('eventType' in event) {
+    response.write(
+      `id: ${event.sequence}\nevent: ${event.eventType}\ndata: ${JSON.stringify(event.payload)}\n\n`,
+    );
+    return;
+  }
+  response.write(`event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`);
 }
 
 function requireWriteSecurity(

@@ -6,6 +6,7 @@
   "dependencies": {
     "@dreamstory/application": "workspace:*",
     "@dreamstory/contracts": "workspace:*",
+    "@dreamstory/model-gateway": "workspace:*",
     "@dreamstory/storage-sqlite": "workspace:*",
     "@dreamstory/story-context": "workspace:*",
     "fastify": "5.12.7"

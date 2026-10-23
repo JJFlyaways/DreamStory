@@ -1,6 +1,7 @@
 export * from './config.js';
 export * from './session.js';
 export * from './server.js';
+export * from './agent-runtime.js';
 
 import { fileURLToPath } from 'node:url';
 

@@ -9,6 +9,7 @@
   "references": [
     { "path": "../../packages/contracts" },
     { "path": "../../packages/application" },
+    { "path": "../../packages/model-gateway" },
     { "path": "../../packages/storage-sqlite" },
     { "path": "../../packages/story-context" }
   ],

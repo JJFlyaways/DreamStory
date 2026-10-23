@@ -105,7 +105,7 @@ test('creates, reopens, idempotently retries, and protects book revisions', asyn
     assert.deepEqual(health.json().data.database, {
       available: true,
       status: 'ready',
-      schemaVersion: 3,
+      schemaVersion: 4,
     });
 
     const updates = await Promise.all([
@@ -412,6 +412,109 @@ test('lists books and rebuilds Markdown/TXT exports with consistent backups', as
     assert.match(backup.json().data.relativePath, /^backups\/story\.\d+T\d+Z\.sqlite$/);
     assert.equal(backup.json().data.relativePath.includes(directory), false);
     assert.equal(backup.json().data.sizeBytes > 0, true);
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('starts a fake-model run and persists author-review artifacts', async () => {
+  const directory = await createTestDirectory();
+  const config = parseServerConfig({
+    env: {
+      DREAMSTORY_LIBRARY_ROOT: directory,
+      DREAMSTORY_ALLOWED_ORIGINS: 'http://127.0.0.1:3000',
+      DREAMSTORY_MODEL_PROFILES: JSON.stringify([
+        {
+          id: 'fake_writer',
+          protocol: 'fake',
+          endpoint: 'http://127.0.0.1:9999',
+          model: 'fake-writer',
+          capabilities: ['stream_text', 'structured_output'],
+          purposes: ['writing'],
+        },
+      ]),
+    },
+    platform: 'linux',
+    homeDirectory: directory,
+    workingDirectory: directory,
+  });
+  const app = createServer(config, new BookProjectManager(config.libraryRoot));
+  try {
+    const session = await app.inject({ method: 'GET', url: '/api/v1/session' });
+    const sessionBody = session.json();
+    const headers = {
+      origin: config.listen.allowedOrigins[0],
+      cookie: getCookie(session),
+      'x-story-csrf': sessionBody.data.csrfToken,
+    };
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/v1/books',
+      headers,
+      payload: {
+        clientRequestId: 'd6c53a6b-e3af-42b1-898a-7a9d5d6a4229',
+        title: '运行测试书',
+        language: 'zh-CN',
+        genre: '悬疑',
+        premise: '验证 Agent 运行持久化。',
+      },
+    });
+    const bookId = create.json().data.id;
+    const plan = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/books/${bookId}/plans/plan_book`,
+      headers,
+      payload: {
+        clientRequestId: 'a3e779dd-65c7-4ab0-b53b-80e5dc0b87d5',
+        expectedBookRevision: 1,
+        parentId: null,
+        kind: 'book',
+        sortKey: '0001',
+        content: {
+          title: '运行测试书',
+          goal: '生成一个可审阅候选',
+          conflict: '测试模型需要遵守边界',
+          startState: '尚未生成',
+          endState: '候选已保存',
+          requiredBeats: ['输出正文'],
+          avoid: ['越界写下一章'],
+        },
+      },
+    });
+    assert.equal(plan.statusCode, 201);
+
+    const started = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/runs`,
+      headers,
+      payload: {
+        intent: 'draft_chapter',
+        expectedBookRevision: 2,
+        target: { planId: 'plan_book' },
+        modelProfileId: 'fake_writer',
+        scope: { chapterNumbers: [1] },
+      },
+    });
+    assert.equal(started.statusCode, 202);
+    const runId = started.json().data.id;
+    let run;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/books/${bookId}/runs/${runId}`,
+      });
+      run = response.json().data;
+      if (run.status === 'awaiting_author' || run.status === 'failed') break;
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 5));
+    }
+    assert.equal(run.status, 'awaiting_author');
+    const artifacts = await app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${bookId}/runs/${runId}/artifacts`,
+    });
+    assert.equal(artifacts.statusCode, 200);
+    assert.equal(artifacts.json().data.at(-1).complete, true);
   } finally {
     await app.close();
     await rm(directory, { recursive: true, force: true });
