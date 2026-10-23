@@ -290,6 +290,13 @@ importers:
       '@dreamstory/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@dreamstory/model-gateway':
+        specifier: workspace:*
+        version: link:../model-gateway
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
 
   packages/contracts: {}
 

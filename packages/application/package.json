@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@dreamstory/contracts": "workspace:*"
+    "@dreamstory/contracts": "workspace:*",
+    "@dreamstory/model-gateway": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5"
   },
   "exports": {
     ".": {
