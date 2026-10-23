@@ -13,6 +13,8 @@ import {
   WritingCommandError,
   FinalizationError,
   FinalizationService,
+  ReviewService,
+  ReviewValidationError,
   renderBookExport,
   type CreateBookCommand,
   type CreateChapterCommand,
@@ -22,6 +24,7 @@ import {
   type PlanNodeCommand,
   type RestoreDraftCommand,
   type RunEventRecord,
+  type SaveReviewCommand,
   type TransientRunEvent,
   type SaveDraftCommand,
   type UpdateBookCommand,
@@ -39,6 +42,8 @@ import {
   type PlanKind,
   type PlanNodeStatus,
   type ServerConfig,
+  type ReviewDisposition,
+  type ReviewFindingInput,
   type StableId,
 } from '@dreamstory/contracts';
 import {
@@ -292,6 +297,44 @@ export class BookProjectManager {
     const chapter = await initialized.repositories.chapters.get(bookId, chapterId);
     if (chapter === null) throw new BookCommandError('NOT_FOUND', 'The chapter does not exist.');
     return initialized.repositories.finalizations.list(chapterId);
+  }
+
+  async saveReview(command: SaveReviewCommand) {
+    const initialized = await this.openBook(command.bookId);
+    return new ReviewService(
+      initialized.repositories.drafts,
+      initialized.repositories.reviews,
+    ).save(command);
+  }
+
+  async listReviews(bookId: StableId, chapterId: StableId) {
+    const initialized = await this.openBook(bookId);
+    return initialized.repositories.reviews.listByChapter(bookId, chapterId);
+  }
+
+  async listReviewFindings(bookId: StableId, reviewId: StableId) {
+    const initialized = await this.openBook(bookId);
+    const review = await initialized.repositories.reviews.get(bookId, reviewId);
+    if (review === null) throw new BookCommandError('NOT_FOUND', 'The review does not exist.');
+    return initialized.repositories.reviews.listFindings(reviewId);
+  }
+
+  async setReviewDisposition(
+    bookId: StableId,
+    findingId: StableId,
+    expectedRevision: number,
+    disposition: ReviewDisposition,
+  ) {
+    const initialized = await this.openBook(bookId);
+    const finding = await initialized.repositories.reviews.getFinding(findingId);
+    if (finding === null) throw new ReviewValidationError('The review finding does not exist.');
+    const chapter = await initialized.repositories.chapters.get(bookId, finding.chapterId);
+    if (chapter === null)
+      throw new ReviewValidationError('The review finding belongs to another book.');
+    return new ReviewService(
+      initialized.repositories.drafts,
+      initialized.repositories.reviews,
+    ).setDisposition(findingId, expectedRevision, disposition, nowUtc());
   }
 
   async createBackup(bookId: StableId): Promise<BackupResult> {
@@ -985,6 +1028,77 @@ export function createServer(
     },
   );
 
+  app.post<{
+    Params: { bookId: string; chapterId: string };
+  }>('/api/v1/books/:bookId/chapters/:chapterId/reviews', async (request, reply) => {
+    if (!requireWriteSecurity(request, reply, sessions)) return;
+    try {
+      const body = parseReviewBody(request.body);
+      const review = await projectManager.saveReview({
+        reviewId: body.reviewId,
+        chapterId: parseStableId(request.params.chapterId),
+        bookId: parseBookId(request.params.bookId),
+        draftVersionId: body.draftVersionId,
+        findings: body.findings,
+        createdAt: nowUtc(),
+      });
+      return reply.code(201).send({ data: review });
+    } catch (error) {
+      return sendCommandError(reply, request, error);
+    }
+  });
+
+  app.get<{ Params: { bookId: string; chapterId: string } }>(
+    '/api/v1/books/:bookId/chapters/:chapterId/reviews',
+    async (request, reply) => {
+      try {
+        return {
+          data: await projectManager.listReviews(
+            parseBookId(request.params.bookId),
+            parseStableId(request.params.chapterId),
+          ),
+        };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { bookId: string; reviewId: string } }>(
+    '/api/v1/books/:bookId/reviews/:reviewId/findings',
+    async (request, reply) => {
+      try {
+        return {
+          data: await projectManager.listReviewFindings(
+            parseBookId(request.params.bookId),
+            parseStableId(request.params.reviewId),
+          ),
+        };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { bookId: string; findingId: string } }>(
+    '/api/v1/books/:bookId/reviews/findings/:findingId/disposition',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) return;
+      try {
+        const body = parseDispositionBody(request.body);
+        const finding = await projectManager.setReviewDisposition(
+          parseBookId(request.params.bookId),
+          parseStableId(request.params.findingId),
+          body.expectedFindingRevision,
+          body.decision,
+        );
+        return { data: finding };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
   app.addHook('onClose', async () => {
     await projectManager.closeAll();
   });
@@ -1187,6 +1301,76 @@ function parseFinalizationBody(value: unknown): {
     ),
     draftVersionId: parseStableId(requiredString(record['draftVersionId'])),
     contentHash: requiredString(record['contentHash']),
+  };
+}
+
+function parseReviewBody(value: unknown): {
+  reviewId: StableId;
+  draftVersionId: StableId;
+  findings: ReviewFindingInput[];
+} {
+  const record = asRecord(value);
+  const rawFindings = record['findings'];
+  if (!Array.isArray(rawFindings)) throw new Error('findings must be an array.');
+  return {
+    reviewId: parseStableId(requiredString(record['reviewId'])),
+    draftVersionId: parseStableId(requiredString(record['draftVersionId'])),
+    findings: rawFindings.map((value) => {
+      const finding = asRecord(value);
+      const evidence = asRecord(finding['evidence']);
+      const textRange = asRecord(evidence['textRange']);
+      return {
+        id: requiredString(finding['id']),
+        kind: requiredString(finding['kind']) as ReviewFindingInput['kind'],
+        severity: requiredString(finding['severity']) as ReviewFindingInput['severity'],
+        claim: requiredString(finding['claim']),
+        evidence: {
+          kind: 'draft',
+          id: parseStableId(requiredString(evidence['id'])),
+          version:
+            evidence['version'] === null
+              ? null
+              : parsePositiveInteger(evidence['version'], 'evidence.version'),
+          contentHash: requiredString(
+            evidence['contentHash'],
+          ) as ReviewFindingInput['evidence']['contentHash'],
+          ...(evidence['chapterNumber'] === undefined
+            ? {}
+            : {
+                chapterNumber: parsePositiveInteger(
+                  evidence['chapterNumber'],
+                  'evidence.chapterNumber',
+                ),
+              }),
+          textRange: {
+            start: parseNonNegativeInteger(textRange['start'], 'evidence.textRange.start'),
+            end: parseNonNegativeInteger(textRange['end'], 'evidence.textRange.end'),
+            quoteHash: requiredString(textRange['quoteHash']) as NonNullable<
+              ReviewFindingInput['evidence']['textRange']
+            >['quoteHash'],
+          },
+        },
+        suggestion: requiredString(finding['suggestion']),
+      };
+    }),
+  };
+}
+
+function parseDispositionBody(value: unknown): {
+  expectedFindingRevision: number;
+  decision: ReviewDisposition;
+} {
+  const record = asRecord(value);
+  const decision = requiredString(record['decision']);
+  if (decision !== 'accept' && decision !== 'ignore' && decision !== 'intentional') {
+    throw new Error('decision must be accept, ignore, or intentional.');
+  }
+  return {
+    expectedFindingRevision: parsePositiveInteger(
+      record['expectedFindingRevision'],
+      'expectedFindingRevision',
+    ),
+    decision,
   };
 }
 
@@ -1443,6 +1627,9 @@ function sendCommandError(reply: FastifyReply, request: FastifyRequest, error: u
     if (error.code === 'SOURCE_STALE') {
       return sendError(reply, request, 409, 'SOURCE_STALE', error.message);
     }
+    return sendError(reply, request, 422, 'PRECONDITION_FAILED', error.message);
+  }
+  if (error instanceof ReviewValidationError) {
     return sendError(reply, request, 422, 'PRECONDITION_FAILED', error.message);
   }
   if (error instanceof BookCommandError) {

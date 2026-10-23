@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -21,6 +22,10 @@ function createConfig(libraryRoot) {
     homeDirectory: libraryRoot,
     workingDirectory: libraryRoot,
   });
+}
+
+function contentHash(value) {
+  return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`;
 }
 
 function getCookie(response) {
@@ -283,6 +288,49 @@ test('manages plan hierarchy, chapters, draft versions, conflicts, and restore',
     });
     assert.equal(secondDraft.statusCode, 201);
     assert.equal(secondDraft.json().data.draftRevision, 2);
+
+    const reviewedContent = secondDraft.json().data.draft.content;
+    const review = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/chapters/chapter_01/reviews`,
+      headers,
+      payload: {
+        reviewId: 'review_api_01',
+        draftVersionId: 'draft_02',
+        findings: [
+          {
+            id: 'finding_api_01',
+            kind: 'continuity',
+            severity: 'major',
+            claim: '这里需要确认邮戳时间。',
+            evidence: {
+              kind: 'draft',
+              id: 'draft_02',
+              version: 2,
+              contentHash: contentHash(reviewedContent),
+              chapterNumber: 1,
+              textRange: { start: 0, end: 2, quoteHash: contentHash('雨停') },
+            },
+            suggestion: '补充时间关系。',
+          },
+        ],
+      },
+    });
+    assert.equal(review.statusCode, 201);
+    const findings = await app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${bookId}/reviews/review_api_01/findings`,
+    });
+    assert.equal(findings.statusCode, 200);
+    assert.equal(findings.json().data[0].disposition, 'open');
+    const disposition = await app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${bookId}/reviews/findings/finding_api_01/disposition`,
+      headers,
+      payload: { expectedFindingRevision: 1, decision: 'intentional' },
+    });
+    assert.equal(disposition.statusCode, 200);
+    assert.equal(disposition.json().data.disposition, 'intentional');
 
     const conflict = await app.inject({
       method: 'PUT',

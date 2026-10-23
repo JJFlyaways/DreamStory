@@ -20,6 +20,7 @@ import type {
 } from './repositories.js';
 
 export interface SaveReviewCommand {
+  bookId: StableId;
   reviewId: StableId;
   chapterId: StableId;
   draftVersionId: StableId;

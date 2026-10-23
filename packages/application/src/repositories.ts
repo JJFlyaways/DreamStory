@@ -208,6 +208,7 @@ export interface ReviewRepository {
   get(bookId: StableId, reviewId: StableId): Promise<ReviewRecord | null>;
   listByChapter(bookId: StableId, chapterId: StableId): Promise<readonly ReviewRecord[]>;
   listFindings(reviewId: StableId): Promise<readonly ReviewFindingRecord[]>;
+  getFinding(findingId: StableId): Promise<ReviewFindingRecord | null>;
   save(review: ReviewRecord, findings: readonly ReviewFindingRecord[]): Promise<void>;
   updateFindingDisposition(
     findingId: StableId,

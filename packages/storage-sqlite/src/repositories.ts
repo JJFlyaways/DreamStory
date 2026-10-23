@@ -543,6 +543,15 @@ export class SqliteReviewRepository implements ReviewRepository {
       .map(mapReviewFinding);
   }
 
+  async getFinding(findingId: StableId): Promise<ReviewFindingRecord | null> {
+    const row = this.database
+      .select()
+      .from(reviewFindings)
+      .where(eq(reviewFindings.id, findingId))
+      .get();
+    return row === undefined ? null : mapReviewFinding(row);
+  }
+
   async save(review: ReviewRecord, findings: readonly ReviewFindingRecord[]): Promise<void> {
     this.database.transaction((tx) => {
       tx.insert(reviews)
