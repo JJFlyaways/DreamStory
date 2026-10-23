@@ -10,6 +10,7 @@ import {
   ChapterService,
   DraftService,
   PlanService,
+  ProposalService,
   WritingCommandError,
   FinalizationError,
   FinalizationService,
@@ -22,6 +23,7 @@ import {
   type FinalizeChapterCommand,
   type BookRecord,
   type PlanNodeCommand,
+  type ProposalRecord,
   type RestoreDraftCommand,
   type RunEventRecord,
   type SaveReviewCommand,
@@ -33,6 +35,7 @@ import { AgentRuntime, type StartAgentRunInput } from './agent-runtime.js';
 import {
   CONTRACT_VERSION,
   parseClientRequestId,
+  parseSourceFingerprint,
   parseStableId,
   parseUtcDateTime,
   type BookRevision,
@@ -335,6 +338,30 @@ export class BookProjectManager {
       initialized.repositories.drafts,
       initialized.repositories.reviews,
     ).setDisposition(findingId, expectedRevision, disposition, nowUtc());
+  }
+
+  async saveProposal(proposal: ProposalRecord): Promise<ProposalRecord> {
+    const initialized = await this.openBook(proposal.bookId);
+    return new ProposalService(initialized.repositories.proposals).save(proposal);
+  }
+
+  async listProposals(bookId: StableId) {
+    const initialized = await this.openBook(bookId);
+    return initialized.repositories.proposals.list(bookId);
+  }
+
+  async setProposalStatus(
+    bookId: StableId,
+    proposalId: StableId,
+    status: ProposalRecord['status'],
+  ) {
+    const initialized = await this.openBook(bookId);
+    return new ProposalService(initialized.repositories.proposals).setStatus(
+      bookId,
+      proposalId,
+      status,
+      nowUtc(),
+    );
   }
 
   async createBackup(bookId: StableId): Promise<BackupResult> {
@@ -674,6 +701,65 @@ export function createServer(
       return sendCommandError(reply, _request, error);
     }
   });
+
+  app.post<{ Params: { bookId: string } }>(
+    '/api/v1/books/:bookId/proposals',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) return;
+      try {
+        const bookId = parseBookId(request.params.bookId);
+        const body = parseProposalBody(request.body);
+        const proposal: ProposalRecord = {
+          id: body.id,
+          bookId,
+          kind: body.kind,
+          payload: body.payload,
+          revision: 1,
+          sourceFingerprint: body.sourceFingerprint,
+          status: 'pending',
+          sourceRunId: body.sourceRunId,
+          createdAt: nowUtc(),
+          updatedAt: nowUtc(),
+        };
+        return reply.code(201).send({ data: await projectManager.saveProposal(proposal) });
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { bookId: string } }>(
+    '/api/v1/books/:bookId/proposals',
+    async (request, reply) => {
+      try {
+        return { data: await projectManager.listProposals(parseBookId(request.params.bookId)) };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { bookId: string; proposalId: string } }>(
+    '/api/v1/books/:bookId/proposals/:proposalId/status',
+    async (request, reply) => {
+      if (!requireWriteSecurity(request, reply, sessions)) return;
+      try {
+        const body = asRecord(request.body);
+        const status = requiredString(body['status']);
+        if (status !== 'accepted' && status !== 'rejected' && status !== 'stale') {
+          throw new Error('status must be accepted, rejected, or stale.');
+        }
+        const proposal = await projectManager.setProposalStatus(
+          parseBookId(request.params.bookId),
+          parseStableId(request.params.proposalId),
+          status,
+        );
+        return { data: proposal };
+      } catch (error) {
+        return sendCommandError(reply, request, error);
+      }
+    },
+  );
 
   app.post('/api/v1/books', async (request, reply) => {
     if (!requireWriteSecurity(request, reply, sessions)) {
@@ -1301,6 +1387,30 @@ function parseFinalizationBody(value: unknown): {
     ),
     draftVersionId: parseStableId(requiredString(record['draftVersionId'])),
     contentHash: requiredString(record['contentHash']),
+  };
+}
+
+function parseProposalBody(value: unknown): {
+  id: StableId;
+  kind: ProposalRecord['kind'];
+  payload: unknown;
+  sourceFingerprint: ProposalRecord['sourceFingerprint'];
+  sourceRunId: StableId | null;
+} {
+  const record = asRecord(value);
+  const kind = requiredString(record['kind']);
+  if (kind !== 'plan' && kind !== 'fact' && kind !== 'revision') {
+    throw new Error('kind must be plan, fact, or revision.');
+  }
+  return {
+    id: parseStableId(requiredString(record['id'])),
+    kind,
+    payload: record['payload'],
+    sourceFingerprint: parseSourceFingerprint(requiredString(record['sourceFingerprint'])),
+    sourceRunId:
+      record['sourceRunId'] === null || record['sourceRunId'] === undefined
+        ? null
+        : parseStableId(requiredString(record['sourceRunId'])),
   };
 }
 
