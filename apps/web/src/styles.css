@@ -1,7 +1,7 @@
 :root {
   color: #172126;
   background: #10232b;
-  font-family: 'Inter', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-family: var(--dsh-font-family-text-default);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --ink: #10232b;
@@ -23,7 +23,20 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: var(--ink);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family);
+  background: var(--dsw-alias-bg-base);
+  --ink: var(--dsw-static-neutral-bluish-1000);
+  --ink-soft: var(--dsw-static-neutral-bluish-950);
+  --paper: var(--dsw-alias-bg-base);
+  --paper-deep: var(--dsw-alias-bg-layer-1);
+  --white: var(--dsw-alias-label-primary-foreground);
+  --muted: var(--dsw-alias-label-tertiary);
+  --teal: var(--dsw-alias-state-business-primary);
+  --teal-deep: var(--dsw-alias-state-business-primary);
+  --amber: var(--dsw-alias-state-warn-primary);
+  --danger: var(--dsw-alias-state-error-primary);
+  --line: var(--dsw-alias-border-l3);
 }
 button,
 input,
@@ -38,7 +51,8 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--amber);
+  outline: var(--dsw-focus-ring-width) solid
+    var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 3px;
 }
 
