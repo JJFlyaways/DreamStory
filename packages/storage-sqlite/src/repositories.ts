@@ -45,6 +45,7 @@ import type {
   RunStepRecord,
   RunRecord,
   RunPersistenceRepository,
+  SearchRepository,
   ThreadRepository,
 } from '@dreamstory/application';
 import { and, asc, desc, eq, lte } from 'drizzle-orm';
@@ -86,6 +87,7 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     facts: new SqliteFactRepository(database),
     factRevelations: new SqliteFactRevelationRepository(database),
     threads: new SqliteThreadRepository(database),
+    search: new SqliteSearchRepository(database),
     proposals: new SqliteProposalRepository(database),
     reviews: new SqliteReviewRepository(database),
     finalizations: new SqliteFinalizationRepository(database),
@@ -838,6 +840,242 @@ export class SqliteThreadRepository implements ThreadRepository {
       .all()
       .map(mapThreadEvent);
   }
+}
+
+export class SqliteSearchRepository implements SearchRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async rebuild(bookId: string) {
+    const client = this.database.$client;
+    const chapterRows = this.database
+      .select()
+      .from(chapters)
+      .where(eq(chapters.bookId, bookId))
+      .all();
+    const currentChapters = new Map(
+      chapterRows.map((chapter) => [chapter.id, chapter]),
+    );
+    const finalizationRows = this.database.select().from(finalizations).all();
+    const entitiesByBook = this.database
+      .select()
+      .from(entities)
+      .where(eq(entities.bookId, bookId))
+      .all()
+      .map((entity) => ({
+        id: entity.id,
+        name: entity.name,
+        aliases: parseStringArray(entity.aliasesJson),
+      }));
+    const currentFinalizations = finalizationRows.flatMap((finalization) => {
+      const chapter = currentChapters.get(finalization.chapterId);
+      if (chapter === undefined || chapter.currentFinalizationId !== finalization.id) return [];
+      return [{ finalization, chapter }];
+    });
+
+    const rebuild = client.transaction(() => {
+      client.prepare('DELETE FROM chapter_fts WHERE book_id = ?').run(bookId);
+      client.prepare('DELETE FROM entity_mentions WHERE book_id = ?').run(bookId);
+      const insertChapter = client.prepare(
+        `INSERT INTO chapter_fts (
+          finalization_id, book_id, chapter_id, chapter_number, content
+        ) VALUES (?, ?, ?, ?, ?)`,
+      );
+      const insertMention = client.prepare(
+        `INSERT INTO entity_mentions (
+          book_id, entity_id, term, match_kind, finalization_id,
+          chapter_id, chapter_number, start_char, end_char
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      let mentionCount = 0;
+      for (const { finalization, chapter } of currentFinalizations) {
+        insertChapter.run(
+          finalization.id,
+          bookId,
+          chapter.id,
+          chapter.chapterNumber,
+          finalization.content,
+        );
+        for (const entity of entitiesByBook) {
+          const terms = new Map<string, 'name' | 'alias'>();
+          terms.set(entity.name, 'name');
+          for (const alias of entity.aliases) {
+            if (!terms.has(alias)) terms.set(alias, 'alias');
+          }
+          for (const [term, matchKind] of terms) {
+            for (const position of findOccurrences(finalization.content, term)) {
+              insertMention.run(
+                bookId,
+                entity.id,
+                term,
+                matchKind,
+                finalization.id,
+                chapter.id,
+                chapter.chapterNumber,
+                position.start,
+                position.end,
+              );
+              mentionCount += 1;
+            }
+          }
+        }
+      }
+      return { indexedChapters: currentFinalizations.length, indexedEntityMentions: mentionCount };
+    });
+    return rebuild();
+  }
+
+  async search(bookId: string, query: string, limit: number) {
+    const client = this.database.$client;
+    const exactRows = client
+      .prepare(
+        `SELECT entity_id, match_kind, finalization_id, chapter_id, chapter_number,
+                start_char, end_char, term
+         FROM entity_mentions
+         WHERE book_id = ? AND term = ?
+         ORDER BY CASE match_kind WHEN 'name' THEN 0 ELSE 1 END, chapter_number, id
+         LIMIT ?`,
+      )
+      .all(bookId, query, limit) as readonly EntityMentionRow[];
+    const exactHits = exactRows.map((row) => ({
+      kind: 'entity' as const,
+      score: row.match_kind === 'name' ? 3 : 2.5,
+      reason: row.match_kind === 'name' ? ('entity_exact' as const) : ('entity_alias' as const),
+      entityId: parseStableId(row.entity_id),
+      finalizationId: parseStableId(row.finalization_id),
+      chapterId: parseStableId(row.chapter_id),
+      chapterNumber: row.chapter_number,
+      position: { start: row.start_char, end: row.end_char },
+      excerpt: row.term,
+    }));
+
+    const ftsHits = this.searchFts(client, bookId, query, limit);
+    return [...exactHits, ...ftsHits]
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          (left.chapterNumber ?? Number.MAX_SAFE_INTEGER) -
+            (right.chapterNumber ?? Number.MAX_SAFE_INTEGER),
+      )
+      .slice(0, limit);
+  }
+
+  private searchFts(
+    client: StoryDatabase['$client'],
+    bookId: string,
+    query: string,
+    limit: number,
+  ) {
+    const rows = this.runFtsQuery(client, bookId, query, limit);
+    const candidates = rows.length > 0 ? rows : this.runSubstringQuery(client, bookId, query, limit);
+    return candidates.map((row) => {
+      const position = findOccurrences(row.content, query)[0] ?? null;
+      return {
+        kind: 'chapter' as const,
+        score: 1,
+        reason: 'full_text' as const,
+        entityId: null,
+        finalizationId: parseStableId(row.finalization_id),
+        chapterId: parseStableId(row.chapter_id),
+        chapterNumber: row.chapter_number,
+        position,
+        excerpt: row.excerpt || makeExcerpt(row.content, query),
+      };
+    });
+  }
+
+  private runFtsQuery(
+    client: StoryDatabase['$client'],
+    bookId: string,
+    query: string,
+    limit: number,
+  ): readonly ChapterSearchRow[] {
+    try {
+      return client
+        .prepare(
+          `SELECT finalization_id, chapter_id, chapter_number, content,
+                  snippet(chapter_fts, 4, '', '', '…', 24) AS excerpt,
+                  bm25(chapter_fts) AS rank
+           FROM chapter_fts
+           WHERE book_id = ? AND chapter_fts MATCH ?
+           ORDER BY rank
+           LIMIT ?`,
+        )
+        .all(bookId, quoteFtsQuery(query), limit) as readonly ChapterSearchRow[];
+    } catch {
+      return [];
+    }
+  }
+
+  private runSubstringQuery(
+    client: StoryDatabase['$client'],
+    bookId: string,
+    query: string,
+    limit: number,
+  ): readonly ChapterSearchRow[] {
+    return client
+      .prepare(
+        `SELECT finalization_id, chapter_id, chapter_number, content,
+                '' AS excerpt, 0 AS rank
+         FROM chapter_fts
+         WHERE book_id = ? AND instr(content, ?) > 0
+         ORDER BY chapter_number
+         LIMIT ?`,
+      )
+      .all(bookId, query, limit) as readonly ChapterSearchRow[];
+  }
+}
+
+interface EntityMentionRow {
+  entity_id: string;
+  match_kind: 'name' | 'alias';
+  finalization_id: string;
+  chapter_id: string;
+  chapter_number: number;
+  start_char: number;
+  end_char: number;
+  term: string;
+}
+
+interface ChapterSearchRow {
+  finalization_id: string;
+  chapter_id: string;
+  chapter_number: number;
+  content: string;
+  excerpt: string;
+  rank: number;
+}
+
+function parseStringArray(value: string): readonly string[] {
+  const parsed = JSON.parse(value) as unknown;
+  return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function findOccurrences(content: string, term: string): readonly { start: number; end: number }[] {
+  if (term === '') return [];
+  const characters = Array.from(content);
+  const needle = Array.from(term);
+  const positions: { start: number; end: number }[] = [];
+  for (let start = 0; start <= characters.length - needle.length; start += 1) {
+    if (needle.every((character, offset) => characters[start + offset] === character)) {
+      positions.push({ start, end: start + needle.length });
+    }
+  }
+  return positions;
+}
+
+function makeExcerpt(content: string, query: string): string {
+  const position = findOccurrences(content, query)[0];
+  if (position === undefined) return content.slice(0, 120);
+  const characters = Array.from(content);
+  const start = Math.max(0, position.start - 40);
+  const end = Math.min(characters.length, position.end + 80);
+  return `${start > 0 ? '…' : ''}${characters.slice(start, end).join('')}${
+    end < characters.length ? '…' : ''
+  }`;
+}
+
+function quoteFtsQuery(query: string): string {
+  return `"${query.replaceAll('"', '""')}"`;
 }
 
 class RevisionRaceError extends Error {}

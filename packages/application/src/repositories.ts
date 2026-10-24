@@ -22,6 +22,8 @@ import type {
   SourceFingerprint,
   RunIntent,
   RunStatus,
+  SearchHit,
+  SearchRebuildResult,
   StableId,
   StoryThreadRecord,
   ThreadEventRecord,
@@ -234,6 +236,11 @@ export interface ThreadRepository {
   listEvents(bookId: StableId, threadId: StableId): Promise<readonly ThreadEventRecord[]>;
 }
 
+export interface SearchRepository {
+  rebuild(bookId: StableId): Promise<SearchRebuildResult>;
+  search(bookId: StableId, query: string, limit: number): Promise<readonly SearchHit[]>;
+}
+
 export interface ProposalRecord {
   id: StableId;
   bookId: StableId;
@@ -362,6 +369,7 @@ export interface RepositorySet {
   facts: FactRepository;
   factRevelations: FactRevelationRepository;
   threads: ThreadRepository;
+  search: SearchRepository;
   proposals: ProposalRepository;
   reviews: ReviewRepository;
   finalizations: FinalizationRepository;
