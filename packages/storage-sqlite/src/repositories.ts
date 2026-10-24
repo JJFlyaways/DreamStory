@@ -19,8 +19,11 @@ import type {
   DraftSaveInput,
   DraftSaveResult,
   DraftVersionRecord,
+  EntityRepository,
   FinalizationRecord,
   FinalizationRepository,
+  FactAppendInput,
+  FactRepository,
   InputSnapshotRecord,
   ModelCallRecord,
   OutboxJobRecord,
@@ -50,6 +53,8 @@ import {
   chapters,
   commandReceipts,
   draftVersions,
+  entities,
+  facts,
   outboxJobs,
   planNodeVersions,
   planNodes,
@@ -72,6 +77,8 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     plans: new SqlitePlanRepository(database),
     chapters: new SqliteChapterRepository(database),
     drafts: new SqliteDraftRepository(database),
+    entities: new SqliteEntityRepository(database),
+    facts: new SqliteFactRepository(database),
     proposals: new SqliteProposalRepository(database),
     reviews: new SqliteReviewRepository(database),
     finalizations: new SqliteFinalizationRepository(database),
@@ -392,6 +399,211 @@ export class SqliteDraftRepository implements DraftRepository {
     });
   }
 }
+
+export class SqliteEntityRepository implements EntityRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async get(bookId: string, id: string) {
+    const row = this.database
+      .select()
+      .from(entities)
+      .where(and(eq(entities.bookId, bookId), eq(entities.id, id)))
+      .get();
+    return row === undefined ? null : mapEntity(row);
+  }
+
+  async list(bookId: string) {
+    return this.database
+      .select()
+      .from(entities)
+      .where(eq(entities.bookId, bookId))
+      .orderBy(asc(entities.name))
+      .all()
+      .map(mapEntity);
+  }
+
+  async create(entity: Parameters<EntityRepository['create']>[0], expectedBookRevision: number) {
+    try {
+      return this.database.transaction((tx) => {
+        const book = tx.select().from(books).where(eq(books.id, entity.bookId)).get();
+        if (book === undefined || book.bookRevision !== expectedBookRevision) return null;
+        const duplicate = tx
+          .select()
+          .from(entities)
+          .where(and(eq(entities.bookId, entity.bookId), eq(entities.name, entity.name)))
+          .get();
+        if (duplicate !== undefined) return null;
+
+        tx.insert(entities)
+          .values({
+            id: entity.id,
+            bookId: entity.bookId,
+            kind: entity.kind,
+            name: entity.name,
+            aliasesJson: stringifyJson(entity.aliases),
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+          })
+          .run();
+        const updated = tx
+          .update(books)
+          .set({ bookRevision: expectedBookRevision + 1, updatedAt: entity.updatedAt })
+          .where(and(eq(books.id, entity.bookId), eq(books.bookRevision, expectedBookRevision)))
+          .run();
+        if (updated.changes !== 1) throw new RevisionRaceError();
+        return { entity, bookRevision: expectedBookRevision + 1 };
+      });
+    } catch (error) {
+      if (error instanceof RevisionRaceError) return null;
+      throw error;
+    }
+  }
+
+  async updateAliases(
+    bookId: string,
+    id: string,
+    aliases: readonly string[],
+    expectedBookRevision: number,
+    updatedAt: string,
+  ) {
+    try {
+      return this.database.transaction((tx) => {
+        const book = tx.select().from(books).where(eq(books.id, bookId)).get();
+        const entity = tx
+          .select()
+          .from(entities)
+          .where(and(eq(entities.bookId, bookId), eq(entities.id, id)))
+          .get();
+        if (book === undefined || entity === undefined || book.bookRevision !== expectedBookRevision) {
+          return null;
+        }
+        tx.update(entities)
+          .set({ aliasesJson: stringifyJson(aliases), updatedAt })
+          .where(and(eq(entities.bookId, bookId), eq(entities.id, id)))
+          .run();
+        const updated = tx
+          .update(books)
+          .set({ bookRevision: expectedBookRevision + 1, updatedAt })
+          .where(and(eq(books.id, bookId), eq(books.bookRevision, expectedBookRevision)))
+          .run();
+        if (updated.changes !== 1) throw new RevisionRaceError();
+        return {
+          entity: mapEntity({ ...entity, aliasesJson: stringifyJson(aliases), updatedAt }),
+          bookRevision: expectedBookRevision + 1,
+        };
+      });
+    } catch (error) {
+      if (error instanceof RevisionRaceError) return null;
+      throw error;
+    }
+  }
+}
+
+export class SqliteFactRepository implements FactRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async get(bookId: string, id: string) {
+    const row = this.database
+      .select()
+      .from(facts)
+      .where(and(eq(facts.bookId, bookId), eq(facts.id, id)))
+      .get();
+    return row === undefined ? null : mapFact(row);
+  }
+
+  async listByEntity(bookId: string, entityId: string) {
+    return this.database
+      .select()
+      .from(facts)
+      .where(and(eq(facts.bookId, bookId), eq(facts.entityId, entityId)))
+      .orderBy(asc(facts.predicate), asc(facts.validFromChapter), asc(facts.revision))
+      .all()
+      .map(mapFact);
+  }
+
+  async appendVersion(fact: FactAppendInput, expectedBookRevision: number) {
+    try {
+      return this.database.transaction((tx) => {
+        const book = tx.select().from(books).where(eq(books.id, fact.bookId)).get();
+        const entity = tx
+          .select()
+          .from(entities)
+          .where(and(eq(entities.bookId, fact.bookId), eq(entities.id, fact.entityId)))
+          .get();
+        if (book === undefined || entity === undefined || book.bookRevision !== expectedBookRevision) {
+          return null;
+        }
+
+        const history = tx
+          .select()
+          .from(facts)
+          .where(and(eq(facts.entityId, fact.entityId), eq(facts.predicate, fact.predicate)))
+          .orderBy(desc(facts.validFromChapter), desc(facts.revision))
+          .all();
+        if (history.some((row) => row.validFromChapter >= fact.validFromChapter)) return null;
+        const previous = history.find(
+          (row) =>
+            row.validFromChapter < fact.validFromChapter &&
+            (row.validToChapter === null || row.validToChapter >= fact.validFromChapter),
+        );
+        if (previous !== undefined) {
+          tx.update(facts)
+            .set({ validToChapter: fact.validFromChapter - 1, updatedAt: fact.updatedAt })
+            .where(eq(facts.id, previous.id))
+            .run();
+        }
+        const revision = history.reduce((highest, row) => Math.max(highest, row.revision), 0) + 1;
+        const row = {
+          id: fact.id,
+          bookId: fact.bookId,
+          entityId: fact.entityId,
+          predicate: fact.predicate,
+          valueJson: stringifyJson(fact.value),
+          validFromChapter: fact.validFromChapter,
+          validToChapter: null,
+          sourceKind: fact.sourceKind,
+          sourceId: fact.sourceId,
+          sourceHash: fact.sourceHash,
+          revision,
+          createdAt: fact.createdAt,
+          updatedAt: fact.updatedAt,
+        };
+        tx.insert(facts).values(row).run();
+        const updated = tx
+          .update(books)
+          .set({ bookRevision: expectedBookRevision + 1, updatedAt: fact.updatedAt })
+          .where(and(eq(books.id, fact.bookId), eq(books.bookRevision, expectedBookRevision)))
+          .run();
+        if (updated.changes !== 1) throw new RevisionRaceError();
+        return { fact: mapFact(row), bookRevision: expectedBookRevision + 1 };
+      });
+    } catch (error) {
+      if (error instanceof RevisionRaceError) return null;
+      throw error;
+    }
+  }
+
+  async project(bookId: string, chapterNumber: number) {
+    const entityRows = await new SqliteEntityRepository(this.database).list(bookId);
+    const factRows = this.database
+      .select()
+      .from(facts)
+      .where(eq(facts.bookId, bookId))
+      .all()
+      .map(mapFact);
+    return entityRows.map((entity) => ({
+      entity,
+      facts: factRows.filter(
+        (fact) =>
+          fact.entityId === entity.id &&
+          fact.validFromChapter <= chapterNumber &&
+          (fact.validToChapter === null || fact.validToChapter >= chapterNumber),
+      ),
+    }));
+  }
+}
+
+class RevisionRaceError extends Error {}
 
 export class SqliteCommandReceiptRepository implements CommandReceiptRepository {
   constructor(private readonly database: StoryDatabase) {}
@@ -1129,6 +1341,36 @@ function mapLease(row: typeof bookLeases.$inferSelect): BookLeaseRecord {
     ownerId: parseStableId(row.ownerId),
     expiresAt: parseUtcDateTime(row.expiresAt),
     heartbeatAt: parseUtcDateTime(row.heartbeatAt),
+  };
+}
+
+function mapEntity(row: typeof entities.$inferSelect) {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    kind: row.kind,
+    name: row.name,
+    aliases: parseJson(row.aliasesJson) as readonly string[],
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapFact(row: typeof facts.$inferSelect) {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    entityId: parseStableId(row.entityId),
+    predicate: row.predicate,
+    value: parseJson(row.valueJson),
+    validFromChapter: row.validFromChapter,
+    validToChapter: row.validToChapter,
+    sourceKind: row.sourceKind,
+    sourceId: parseStableId(row.sourceId),
+    sourceHash: parseContentHash(row.sourceHash),
+    revision: row.revision,
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
   };
 }
 

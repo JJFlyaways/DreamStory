@@ -45,6 +45,8 @@ export const proposalStatuses = ['pending', 'accepted', 'rejected', 'stale'] as 
 export const reviewFindingKinds = ['continuity', 'style', 'plot', 'fact'] as const;
 export const reviewSeverities = ['info', 'minor', 'major'] as const;
 export const reviewDispositions = ['open', 'accept', 'ignore', 'intentional'] as const;
+export const entityKinds = ['character', 'location', 'organization', 'item', 'world'] as const;
+export const factSourceKinds = ['author', 'finalization', 'import'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -60,6 +62,56 @@ export const books = sqliteTable(
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [index('books_updated_at_idx').on(table.updatedAt)],
+);
+
+export const entities = sqliteTable(
+  'entities',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    kind: text('kind', { enum: entityKinds }).notNull(),
+    name: text('name').notNull(),
+    aliasesJson: text('aliases_json').notNull().default('[]'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    unique('entities_book_name_unique').on(table.bookId, table.name),
+    index('entities_book_kind_idx').on(table.bookId, table.kind, table.name),
+  ],
+);
+
+export const facts = sqliteTable(
+  'facts',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    entityId: text('entity_id').notNull(),
+    predicate: text('predicate').notNull(),
+    valueJson: text('value_json').notNull(),
+    validFromChapter: integer('valid_from_chapter').notNull(),
+    validToChapter: integer('valid_to_chapter'),
+    sourceKind: text('source_kind', { enum: factSourceKinds }).notNull(),
+    sourceId: text('source_id').notNull(),
+    sourceHash: text('source_hash').notNull(),
+    revision: integer('revision').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    unique('facts_entity_predicate_revision_unique').on(
+      table.entityId,
+      table.predicate,
+      table.revision,
+    ),
+    index('facts_book_entity_predicate_idx').on(
+      table.bookId,
+      table.entityId,
+      table.predicate,
+      table.validFromChapter,
+    ),
+    index('facts_book_validity_idx').on(table.bookId, table.validFromChapter, table.validToChapter),
+  ],
 );
 
 export const planNodes = sqliteTable(
@@ -340,6 +392,8 @@ export const finalizations = sqliteTable(
 
 export const schema = {
   books,
+  entities,
+  facts,
   planNodes,
   planNodeVersions,
   chapters,

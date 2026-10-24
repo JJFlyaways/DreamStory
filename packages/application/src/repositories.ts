@@ -3,6 +3,10 @@ import type {
   ClientRequestId,
   ContentHash,
   DraftCreatedBy,
+  EntityRecord,
+  EntityStateProjection,
+  FactRecord,
+  FactSourceKind,
   IsoUtcDateTime,
   PlanContent,
   PlanKind,
@@ -153,6 +157,46 @@ export interface DraftRepository {
   save(input: DraftSaveInput, expectedDraftRevision: number): Promise<DraftSaveResult | null>;
 }
 
+export interface EntityRepository {
+  get(bookId: StableId, id: StableId): Promise<EntityRecord | null>;
+  list(bookId: StableId): Promise<readonly EntityRecord[]>;
+  create(
+    entity: EntityRecord,
+    expectedBookRevision: BookRevision,
+  ): Promise<{ entity: EntityRecord; bookRevision: BookRevision } | null>;
+  updateAliases(
+    bookId: StableId,
+    id: StableId,
+    aliases: readonly string[],
+    expectedBookRevision: BookRevision,
+    updatedAt: IsoUtcDateTime,
+  ): Promise<{ entity: EntityRecord; bookRevision: BookRevision } | null>;
+}
+
+export interface FactAppendInput {
+  id: StableId;
+  bookId: StableId;
+  entityId: StableId;
+  predicate: string;
+  value: unknown;
+  validFromChapter: number;
+  sourceKind: FactSourceKind;
+  sourceId: StableId;
+  sourceHash: ContentHash;
+  createdAt: IsoUtcDateTime;
+  updatedAt: IsoUtcDateTime;
+}
+
+export interface FactRepository {
+  get(bookId: StableId, id: StableId): Promise<FactRecord | null>;
+  listByEntity(bookId: StableId, entityId: StableId): Promise<readonly FactRecord[]>;
+  appendVersion(
+    fact: FactAppendInput,
+    expectedBookRevision: BookRevision,
+  ): Promise<{ fact: FactRecord; bookRevision: BookRevision } | null>;
+  project(bookId: StableId, chapterNumber: number): Promise<readonly EntityStateProjection[]>;
+}
+
 export interface ProposalRecord {
   id: StableId;
   bookId: StableId;
@@ -277,6 +321,8 @@ export interface RepositorySet {
   plans: PlanRepository;
   chapters: ChapterRepository;
   drafts: DraftRepository;
+  entities: EntityRepository;
+  facts: FactRepository;
   proposals: ProposalRepository;
   reviews: ReviewRepository;
   finalizations: FinalizationRepository;
