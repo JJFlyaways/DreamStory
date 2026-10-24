@@ -778,6 +778,201 @@ select {
   word-break: break-word;
 }
 
+.run-timeline {
+  display: grid;
+  gap: 4px;
+  padding: 2px 0 10px;
+}
+
+.run-step {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-height: 24px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+
+.run-step-marker {
+  width: 8px;
+  height: 8px;
+  margin-left: 3px;
+  background: var(--dsw-alias-state-idle-primary);
+  border-radius: 50%;
+}
+
+.run-step-running {
+  color: var(--dsw-alias-label-primary);
+}
+
+.run-step-running .run-step-marker {
+  background: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
+  animation: dsh-run-pulse 1.4s var(--ds-ease-in-out) infinite;
+}
+
+.run-step-completed .run-step-marker {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.run-step-state {
+  color: var(--dsw-alias-label-caption);
+  font-size: 10px;
+}
+
+.run-stream-preview,
+.run-review-output pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0 0 12px;
+  padding: 10px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-markdown-code-block);
+  border-radius: var(--dsw-radius-sm);
+  white-space: pre-wrap;
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.run-review-output {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.candidate-box-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.candidate-box-heading .eyebrow {
+  margin-bottom: 4px;
+}
+
+.candidate-list {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 0 2px;
+}
+
+.candidate-list-item {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  font-size: 10px;
+}
+
+.candidate-list-item:hover,
+.candidate-list-item.is-active {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.review-panel {
+  padding: 0 0 16px;
+  margin-bottom: 20px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.review-finding-list {
+  display: grid;
+}
+
+.review-finding {
+  padding: 12px 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.review-finding-heading,
+.review-finding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-finding-heading {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+}
+
+.review-finding-heading > span:not(:last-child)::after {
+  margin-left: 6px;
+  color: var(--dsw-alias-label-caption);
+  content: '·';
+}
+
+.review-finding-major .review-finding-heading > span:first-child {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.review-finding-claim {
+  margin: 7px 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-finding blockquote {
+  margin: 8px 0;
+  padding: 8px 10px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-document-preview);
+  border-left: 2px solid var(--dsw-alias-state-business-primary);
+  border-radius: var(--dsw-radius-xs);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.review-finding-suggestion,
+.review-finding-disposition {
+  margin: 7px 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.review-finding-actions {
+  margin-top: 8px;
+}
+
+.review-finding-actions .quiet-button,
+.review-finding-actions .text-button {
+  min-height: 26px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.review-source-current {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.review-source-stale {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+@keyframes dsh-run-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
+  }
+}
+
 .candidate-box {
   padding: 12px;
   margin-top: 12px;

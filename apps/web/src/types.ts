@@ -121,6 +121,55 @@ export interface RunArtifact {
   createdAt: string;
 }
 
+export type ReviewFindingKind = 'continuity' | 'style' | 'plot' | 'fact';
+export type ReviewSeverity = 'info' | 'minor' | 'major';
+export type ReviewDisposition = 'open' | 'accept' | 'ignore' | 'intentional';
+
+export interface ReviewRecord {
+  id: string;
+  chapterId: string;
+  draftVersionId: string;
+  draftHash: string;
+  revision: number;
+  createdAt: string;
+}
+
+export interface ReviewFinding {
+  id: string;
+  reviewId: string;
+  chapterId: string;
+  draftVersionId: string;
+  draftHash: string;
+  revision: number;
+  kind: ReviewFindingKind;
+  severity: ReviewSeverity;
+  claim: string;
+  evidence: {
+    kind: 'draft';
+    id: string;
+    version: number | null;
+    contentHash: string;
+    chapterNumber?: number;
+    textRange: {
+      start: number;
+      end: number;
+      quoteHash: string;
+    };
+  };
+  suggestion: string;
+  disposition: ReviewDisposition;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RunEventRecord {
+  runId: string;
+  sequence?: number;
+  eventType: string;
+  payload: unknown;
+  createdAt?: string;
+}
+
 export interface ModelProfile {
   id: string;
   protocol: string;

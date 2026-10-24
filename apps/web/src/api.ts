@@ -6,7 +6,11 @@ import type {
   PlanNode,
   PlanSaveResult,
   ModelProfile,
+  ReviewDisposition,
+  ReviewFinding,
+  ReviewRecord,
   RunArtifact,
+  RunEventRecord,
   RunRecord,
   ShelfEntry,
 } from './types';
@@ -128,9 +132,80 @@ export async function listRunArtifacts(bookId: string, runId: string): Promise<R
   return request<RunArtifact[]>(`/books/${bookId}/runs/${runId}/artifacts`);
 }
 
+const runEventNames = [
+  'run.started',
+  'step.started',
+  'output.delta',
+  'output.snapshot',
+  'step.completed',
+  'run.awaiting_author',
+  'run.paused',
+  'run.completed',
+  'run.failed',
+  'run.cancelled',
+] as const;
+
+export function subscribeRunEvents(
+  bookId: string,
+  runId: string,
+  onEvent: (event: RunEventRecord) => void,
+): () => void {
+  const source = new EventSource(`${API_BASE}/books/${bookId}/runs/${runId}/events`, {
+    withCredentials: true,
+  });
+  const listeners = runEventNames.map((eventName) => {
+    const listener = (event: Event) => {
+      const message = event as MessageEvent<string>;
+      let payload: unknown;
+      try {
+        payload = JSON.parse(message.data) as unknown;
+      } catch {
+        return;
+      }
+      const sequence = Number(message.lastEventId);
+      onEvent({
+        runId,
+        ...(Number.isSafeInteger(sequence) && sequence > 0 ? { sequence } : {}),
+        eventType: eventName,
+        payload,
+      });
+    };
+    source.addEventListener(eventName, listener);
+    return { eventName, listener };
+  });
+  return () => {
+    for (const { eventName, listener } of listeners) {
+      source.removeEventListener(eventName, listener);
+    }
+    source.close();
+  };
+}
+
 export async function cancelRun(bookId: string, runId: string): Promise<{ cancelled: boolean }> {
   return request<{ cancelled: boolean }>(`/books/${bookId}/runs/${runId}/cancel`, {
     method: 'POST',
+  });
+}
+
+export async function listReviews(bookId: string, chapterId: string): Promise<ReviewRecord[]> {
+  return request<ReviewRecord[]>(`/books/${bookId}/chapters/${chapterId}/reviews`);
+}
+
+export async function listReviewFindings(
+  bookId: string,
+  reviewId: string,
+): Promise<ReviewFinding[]> {
+  return request<ReviewFinding[]>(`/books/${bookId}/reviews/${reviewId}/findings`);
+}
+
+export async function setReviewFindingDisposition(
+  bookId: string,
+  findingId: string,
+  input: { expectedFindingRevision: number; decision: Exclude<ReviewDisposition, 'open'> },
+): Promise<ReviewFinding> {
+  return request<ReviewFinding>(`/books/${bookId}/reviews/findings/${findingId}/disposition`, {
+    method: 'POST',
+    body: input,
   });
 }
 
