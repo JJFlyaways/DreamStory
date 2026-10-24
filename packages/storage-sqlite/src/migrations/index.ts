@@ -5,6 +5,7 @@ import { agentRuntimeMigration } from './0004-agent-runtime.js';
 import { reviewProposalMigration } from './0005-review-proposals.js';
 import { finalizationsMigration } from './0006-finalizations.js';
 import { continuityMigration } from './0007-continuity.js';
+import { factRevelationsMigration } from './0008-fact-revelations.js';
 
 export const INITIAL_MIGRATIONS = [
   initialOperationalTablesMigration,
@@ -14,4 +15,5 @@ export const INITIAL_MIGRATIONS = [
   reviewProposalMigration,
   finalizationsMigration,
   continuityMigration,
+  factRevelationsMigration,
 ] as const;

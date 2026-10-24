@@ -47,6 +47,7 @@ export const reviewSeverities = ['info', 'minor', 'major'] as const;
 export const reviewDispositions = ['open', 'accept', 'ignore', 'intentional'] as const;
 export const entityKinds = ['character', 'location', 'organization', 'item', 'world'] as const;
 export const factSourceKinds = ['author', 'finalization', 'import'] as const;
+export const revelationVisibilities = ['author_truth', 'character_known', 'reader_known'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -111,6 +112,27 @@ export const facts = sqliteTable(
       table.validFromChapter,
     ),
     index('facts_book_validity_idx').on(table.bookId, table.validFromChapter, table.validToChapter),
+  ],
+);
+
+export const factRevelations = sqliteTable(
+  'fact_revelations',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    factId: text('fact_id').notNull(),
+    chapterId: text('chapter_id').notNull(),
+    sourceHash: text('source_hash').notNull(),
+    textRangeJson: text('text_range_json'),
+    visibility: text('visibility', { enum: revelationVisibilities }).notNull(),
+    knownToEntityId: text('known_to_entity_id'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('fact_revelations_book_chapter_idx').on(table.bookId, table.chapterId),
+    index('fact_revelations_book_visibility_idx').on(table.bookId, table.visibility),
+    index('fact_revelations_fact_idx').on(table.bookId, table.factId),
   ],
 );
 
@@ -394,6 +416,7 @@ export const schema = {
   books,
   entities,
   facts,
+  factRevelations,
   planNodes,
   planNodeVersions,
   chapters,

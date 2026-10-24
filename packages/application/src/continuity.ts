@@ -5,21 +5,27 @@ import {
   type EntityRecord,
   type EntityStateProjection,
   type FactRecord,
+  type FactRevelationRecord,
   type FactSourceKind,
   type IsoUtcDateTime,
+  type RevelationVisibility,
   type StableId,
+  type TextRange,
 } from '@dreamstory/contracts';
 
 import type {
   CommandReceiptRepository,
+  ChapterRepository,
   EntityRepository,
   FactRepository,
+  FactRevelationRepository,
   RepositorySet,
 } from './repositories.js';
 
 const CREATE_ENTITY_COMMAND = 'create_entity';
 const UPDATE_ENTITY_ALIASES_COMMAND = 'update_entity_aliases';
 const APPEND_FACT_COMMAND = 'append_fact';
+const RECORD_FACT_REVELATION_COMMAND = 'record_fact_revelation';
 
 export interface CreateEntityCommand {
   bookId: StableId;
@@ -55,6 +61,14 @@ export interface AppendFactCommand {
   now: IsoUtcDateTime;
 }
 
+export interface RecordFactRevelationCommand {
+  bookId: StableId;
+  clientRequestId: ClientRequestId;
+  expectedBookRevision: BookRevision;
+  revelation: Omit<FactRevelationRecord, 'createdAt' | 'updatedAt'>;
+  now: IsoUtcDateTime;
+}
+
 export interface ContinuityWriteResult<T> {
   value: T;
   bookRevision: BookRevision;
@@ -81,10 +95,21 @@ export class ContinuityService {
 
   private readonly receipts: CommandReceiptRepository;
 
-  constructor(repositories: Pick<RepositorySet, 'entities' | 'facts' | 'commandReceipts'>) {
+  private readonly chapters: ChapterRepository;
+
+  private readonly factRevelations: FactRevelationRepository;
+
+  constructor(
+    repositories: Pick<
+      RepositorySet,
+      'entities' | 'facts' | 'factRevelations' | 'chapters' | 'commandReceipts'
+    >,
+  ) {
     this.entities = repositories.entities;
     this.facts = repositories.facts;
     this.receipts = repositories.commandReceipts;
+    this.chapters = repositories.chapters;
+    this.factRevelations = repositories.factRevelations;
   }
 
   async createEntity(command: CreateEntityCommand): Promise<ContinuityWriteResult<EntityRecord>> {
@@ -203,6 +228,58 @@ export class ContinuityService {
     }
     return this.facts.project(bookId, chapterNumber);
   }
+
+  async recordRevelation(
+    command: RecordFactRevelationCommand,
+  ): Promise<ContinuityWriteResult<FactRevelationRecord>> {
+    const replay = await this.receipts.find(
+      command.bookId,
+      RECORD_FACT_REVELATION_COMMAND,
+      command.clientRequestId,
+    );
+    if (replay !== null) return parseWriteResult<FactRevelationRecord>(replay.result, true);
+
+    const fact = await this.facts.get(command.bookId, command.revelation.factId);
+    if (fact === null) {
+      throw new ContinuityCommandError('NOT_FOUND', 'The fact does not exist.');
+    }
+    const chapter = await this.chapters.get(command.bookId, command.revelation.chapterId);
+    if (chapter === null) {
+      throw new ContinuityCommandError('NOT_FOUND', 'The revelation chapter does not exist.');
+    }
+    const revelation = await validateRevelation(command.revelation, fact, this.entities);
+    const saved = await this.factRevelations.create(
+      { ...revelation, createdAt: command.now, updatedAt: command.now },
+      command.expectedBookRevision,
+    );
+    if (saved === null) {
+      throw new ContinuityCommandError('REVISION_CONFLICT', 'The book revision has changed.');
+    }
+
+    const result = { value: saved.revelation, bookRevision: saved.bookRevision, replayed: false };
+    await this.receipts.save({
+      bookId: command.bookId,
+      commandKind: RECORD_FACT_REVELATION_COMMAND,
+      clientRequestId: command.clientRequestId,
+      result,
+      createdAt: command.now,
+    });
+    return result;
+  }
+
+  async listRevelationsByFact(
+    bookId: StableId,
+    factId: StableId,
+  ): Promise<readonly FactRevelationRecord[]> {
+    return this.factRevelations.listByFact(bookId, factId);
+  }
+
+  async listRevelationsByVisibility(
+    bookId: StableId,
+    visibility: RevelationVisibility,
+  ): Promise<readonly FactRevelationRecord[]> {
+    return this.factRevelations.listByVisibility(bookId, visibility);
+  }
 }
 
 function normalizeEntity(entity: CreateEntityCommand['entity']): CreateEntityCommand['entity'] {
@@ -239,6 +316,83 @@ function validateFact(predicate: string, value: unknown, validFromChapter: numbe
   } catch {
     throw new ContinuityCommandError('VALIDATION_ERROR', 'Fact value must be JSON serializable.');
   }
+}
+
+async function validateRevelation(
+  revelation: RecordFactRevelationCommand['revelation'],
+  fact: FactRecord,
+  entities: EntityRepository,
+): Promise<RecordFactRevelationCommand['revelation']> {
+  const sourceHash = parseContentHash(revelation.sourceHash);
+  if (sourceHash !== fact.sourceHash) {
+    throw new ContinuityCommandError('VALIDATION_ERROR', 'Revelation source hash is stale.');
+  }
+  if (
+    revelation.visibility !== 'author_truth' &&
+    revelation.visibility !== 'character_known' &&
+    revelation.visibility !== 'reader_known'
+  ) {
+    throw new ContinuityCommandError('VALIDATION_ERROR', 'Revelation visibility is invalid.');
+  }
+  if (revelation.visibility === 'character_known') {
+    if (revelation.knownToEntityId === null) {
+      throw new ContinuityCommandError(
+        'VALIDATION_ERROR',
+        'Character-known revelations require a character entity.',
+      );
+    }
+  } else if (revelation.knownToEntityId !== null) {
+    throw new ContinuityCommandError(
+      'VALIDATION_ERROR',
+      'Only character-known revelations may name a known-to entity.',
+    );
+  }
+  if (revelation.knownToEntityId !== null) {
+    return validateKnownToEntity(revelation, entities, sourceHash);
+  }
+  if (revelation.textRange === null && revelation.visibility !== 'author_truth') {
+    throw new ContinuityCommandError(
+      'VALIDATION_ERROR',
+      'Visible revelations require a source text range.',
+    );
+  }
+  validateTextRange(revelation.textRange);
+  return { ...revelation, sourceHash };
+}
+
+async function validateKnownToEntity(
+  revelation: RecordFactRevelationCommand['revelation'],
+  entities: EntityRepository,
+  sourceHash: ReturnType<typeof parseContentHash>,
+): Promise<RecordFactRevelationCommand['revelation']> {
+  const entity = await entities.get(revelation.bookId, revelation.knownToEntityId as StableId);
+  if (entity === null || entity.kind !== 'character') {
+    throw new ContinuityCommandError(
+      'VALIDATION_ERROR',
+      'knownToEntityId must reference a character in the same book.',
+    );
+  }
+  if (revelation.textRange === null) {
+    throw new ContinuityCommandError(
+      'VALIDATION_ERROR',
+      'Character-known revelations require a source text range.',
+    );
+  }
+  validateTextRange(revelation.textRange);
+  return { ...revelation, sourceHash };
+}
+
+function validateTextRange(range: TextRange | null): void {
+  if (range === null) return;
+  if (
+    !Number.isSafeInteger(range.start) ||
+    !Number.isSafeInteger(range.end) ||
+    range.start < 0 ||
+    range.end <= range.start
+  ) {
+    throw new ContinuityCommandError('VALIDATION_ERROR', 'Revelation text range is invalid.');
+  }
+  parseContentHash(range.quoteHash);
 }
 
 function parseWriteResult<T>(value: unknown, replayed: boolean): ContinuityWriteResult<T> {

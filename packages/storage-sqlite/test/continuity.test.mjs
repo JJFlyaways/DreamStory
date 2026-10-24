@@ -105,15 +105,136 @@ test('keeps stable entities and projects chapter-effective fact versions', async
       ['北站'],
     );
 
+    initialized.connection.db
+      .prepare(
+        `INSERT INTO chapters (
+          id, book_id, chapter_number, display_title, plan_node_id,
+          current_draft_id, current_finalization_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+      )
+      .run(
+        'chapter_01',
+        'book_continuity_01',
+        1,
+        '第一章',
+        'plan_chapter_01',
+        timestamp,
+        timestamp,
+      );
+    initialized.connection.db
+      .prepare(
+        `INSERT INTO chapters (
+          id, book_id, chapter_number, display_title, plan_node_id,
+          current_draft_id, current_finalization_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+      )
+      .run(
+        'chapter_03',
+        'book_continuity_01',
+        3,
+        '第三章',
+        'plan_chapter_03',
+        timestamp,
+        timestamp,
+      );
+
+    const authorTruth = await service.recordRevelation({
+      bookId: 'book_continuity_01',
+      clientRequestId: '6a11b2f5-2f98-4c30-b4c6-6018f2fcf4a6',
+      expectedBookRevision: 4,
+      revelation: {
+        id: 'revelation_author_truth_01',
+        bookId: 'book_continuity_01',
+        factId: 'fact_lyra_location_01',
+        chapterId: 'chapter_01',
+        sourceHash,
+        textRange: null,
+        visibility: 'author_truth',
+        knownToEntityId: null,
+      },
+      now: timestamp,
+    });
+    assert.equal(authorTruth.bookRevision, 5);
+
+    const readerKnown = await service.recordRevelation({
+      bookId: 'book_continuity_01',
+      clientRequestId: 'd6c53a6b-e3af-42b1-898a-7a9d5d6a4229',
+      expectedBookRevision: 5,
+      revelation: {
+        id: 'revelation_reader_known_01',
+        bookId: 'book_continuity_01',
+        factId: 'fact_lyra_location_01',
+        chapterId: 'chapter_01',
+        sourceHash,
+        textRange: { start: 0, end: 2, quoteHash: sourceHash },
+        visibility: 'reader_known',
+        knownToEntityId: null,
+      },
+      now: timestamp,
+    });
+    assert.equal(readerKnown.bookRevision, 6);
+
+    const characterKnown = await service.recordRevelation({
+      bookId: 'book_continuity_01',
+      clientRequestId: 'a3e779dd-65c7-4ab0-b53b-80e5dc0b87d5',
+      expectedBookRevision: 6,
+      revelation: {
+        id: 'revelation_character_known_01',
+        bookId: 'book_continuity_01',
+        factId: 'fact_lyra_location_02',
+        chapterId: 'chapter_03',
+        sourceHash,
+        textRange: { start: 2, end: 4, quoteHash: sourceHash },
+        visibility: 'character_known',
+        knownToEntityId: 'entity_lyra',
+      },
+      now: timestamp,
+    });
+    assert.equal(characterKnown.bookRevision, 7);
+    assert.equal(
+      (await service.listRevelationsByVisibility('book_continuity_01', 'reader_known')).length,
+      1,
+    );
+    assert.equal(
+      (await service.listRevelationsByFact('book_continuity_01', 'fact_lyra_location_02'))[0]
+        .knownToEntityId,
+      'entity_lyra',
+    );
+
+    await assert.rejects(
+      () =>
+        service.recordRevelation({
+          bookId: 'book_continuity_01',
+          clientRequestId: 'a4a0f5f8-7a7d-4dc7-ae84-b9c96d0f55c1',
+          expectedBookRevision: 7,
+          revelation: {
+            id: 'revelation_reader_missing_range',
+            bookId: 'book_continuity_01',
+            factId: 'fact_lyra_location_01',
+            chapterId: 'chapter_01',
+            sourceHash,
+            textRange: null,
+            visibility: 'reader_known',
+            knownToEntityId: null,
+          },
+          now: timestamp,
+        }),
+      (error) => {
+        assert.equal(error instanceof ContinuityCommandError, true);
+        assert.equal(error.code, 'VALIDATION_ERROR');
+        return true;
+      },
+    );
+
     const aliases = await service.updateAliases({
       bookId: 'book_continuity_01',
       clientRequestId: '18b8654e-c799-4bf1-9999-838e356e79f1',
       entityId: 'entity_lyra',
-      expectedBookRevision: 4,
+      expectedBookRevision: 7,
       aliases: ['澜姐', '林编辑'],
       now: timestamp,
     });
-    assert.equal(aliases.bookRevision, 5);
+    assert.equal(aliases.bookRevision, 8);
     assert.deepEqual(aliases.value.aliases, ['澜姐', '林编辑']);
 
     await assert.rejects(
@@ -121,7 +242,7 @@ test('keeps stable entities and projects chapter-effective fact versions', async
         service.appendFact({
           bookId: 'book_continuity_01',
           clientRequestId: 'a4a0f5f8-7a7d-4dc7-ae84-b9c96d0f55c1',
-          expectedBookRevision: 5,
+          expectedBookRevision: 8,
           fact: {
             id: 'fact_lyra_location_overlap',
             entityId: 'entity_lyra',

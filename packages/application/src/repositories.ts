@@ -6,6 +6,7 @@ import type {
   EntityRecord,
   EntityStateProjection,
   FactRecord,
+  FactRevelationRecord,
   FactSourceKind,
   IsoUtcDateTime,
   PlanContent,
@@ -13,6 +14,7 @@ import type {
   PlanNodeStatus,
   ProposalKind,
   ProposalStatus,
+  RevelationVisibility,
   ReviewDisposition,
   ReviewFindingEvidence,
   ReviewFindingKind,
@@ -197,6 +199,19 @@ export interface FactRepository {
   project(bookId: StableId, chapterNumber: number): Promise<readonly EntityStateProjection[]>;
 }
 
+export interface FactRevelationRepository {
+  create(
+    revelation: FactRevelationRecord,
+    expectedBookRevision: BookRevision,
+  ): Promise<{ revelation: FactRevelationRecord; bookRevision: BookRevision } | null>;
+  listByFact(bookId: StableId, factId: StableId): Promise<readonly FactRevelationRecord[]>;
+  listForChapter(bookId: StableId, chapterId: StableId): Promise<readonly FactRevelationRecord[]>;
+  listByVisibility(
+    bookId: StableId,
+    visibility: RevelationVisibility,
+  ): Promise<readonly FactRevelationRecord[]>;
+}
+
 export interface ProposalRecord {
   id: StableId;
   bookId: StableId;
@@ -323,6 +338,7 @@ export interface RepositorySet {
   drafts: DraftRepository;
   entities: EntityRepository;
   facts: FactRepository;
+  factRevelations: FactRevelationRepository;
   proposals: ProposalRepository;
   reviews: ReviewRepository;
   finalizations: FinalizationRepository;

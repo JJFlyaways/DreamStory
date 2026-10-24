@@ -20,6 +20,7 @@ import type {
   DraftSaveResult,
   DraftVersionRecord,
   EntityRepository,
+  FactRevelationRepository,
   FinalizationRecord,
   FinalizationRepository,
   FactAppendInput,
@@ -55,6 +56,7 @@ import {
   draftVersions,
   entities,
   facts,
+  factRevelations,
   outboxJobs,
   planNodeVersions,
   planNodes,
@@ -79,6 +81,7 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     drafts: new SqliteDraftRepository(database),
     entities: new SqliteEntityRepository(database),
     facts: new SqliteFactRepository(database),
+    factRevelations: new SqliteFactRevelationRepository(database),
     proposals: new SqliteProposalRepository(database),
     reviews: new SqliteReviewRepository(database),
     finalizations: new SqliteFinalizationRepository(database),
@@ -600,6 +603,99 @@ export class SqliteFactRepository implements FactRepository {
           (fact.validToChapter === null || fact.validToChapter >= chapterNumber),
       ),
     }));
+  }
+}
+
+export class SqliteFactRevelationRepository implements FactRevelationRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async create(
+    revelation: Parameters<FactRevelationRepository['create']>[0],
+    expectedBookRevision: number,
+  ) {
+    try {
+      return this.database.transaction((tx) => {
+        const book = tx.select().from(books).where(eq(books.id, revelation.bookId)).get();
+        const fact = tx
+          .select()
+          .from(facts)
+          .where(and(eq(facts.bookId, revelation.bookId), eq(facts.id, revelation.factId)))
+          .get();
+        const chapter = tx
+          .select()
+          .from(chapters)
+          .where(and(eq(chapters.bookId, revelation.bookId), eq(chapters.id, revelation.chapterId)))
+          .get();
+        const duplicate = tx
+          .select()
+          .from(factRevelations)
+          .where(eq(factRevelations.id, revelation.id))
+          .get();
+        if (
+          book === undefined ||
+          fact === undefined ||
+          chapter === undefined ||
+          duplicate !== undefined ||
+          book.bookRevision !== expectedBookRevision
+        ) {
+          return null;
+        }
+        const row = {
+          id: revelation.id,
+          bookId: revelation.bookId,
+          factId: revelation.factId,
+          chapterId: revelation.chapterId,
+          sourceHash: revelation.sourceHash,
+          textRangeJson:
+            revelation.textRange === null ? null : stringifyJson(revelation.textRange),
+          visibility: revelation.visibility,
+          knownToEntityId: revelation.knownToEntityId,
+          createdAt: revelation.createdAt,
+          updatedAt: revelation.updatedAt,
+        };
+        tx.insert(factRevelations).values(row).run();
+        const updated = tx
+          .update(books)
+          .set({ bookRevision: expectedBookRevision + 1, updatedAt: revelation.updatedAt })
+          .where(and(eq(books.id, revelation.bookId), eq(books.bookRevision, expectedBookRevision)))
+          .run();
+        if (updated.changes !== 1) throw new RevisionRaceError();
+        return { revelation: mapFactRevelation(row), bookRevision: expectedBookRevision + 1 };
+      });
+    } catch (error) {
+      if (error instanceof RevisionRaceError) return null;
+      throw error;
+    }
+  }
+
+  async listByFact(bookId: string, factId: string) {
+    return this.database
+      .select()
+      .from(factRevelations)
+      .where(and(eq(factRevelations.bookId, bookId), eq(factRevelations.factId, factId)))
+      .orderBy(asc(factRevelations.createdAt))
+      .all()
+      .map(mapFactRevelation);
+  }
+
+  async listForChapter(bookId: string, chapterId: string) {
+    return this.database
+      .select()
+      .from(factRevelations)
+      .where(and(eq(factRevelations.bookId, bookId), eq(factRevelations.chapterId, chapterId)))
+      .orderBy(asc(factRevelations.createdAt))
+      .all()
+      .map(mapFactRevelation);
+  }
+
+  async listByVisibility(bookId: string, visibility: Parameters<FactRevelationRepository['listByVisibility']>[1]) {
+    return this.database
+      .select()
+      .from(factRevelations)
+      .where(and(eq(factRevelations.bookId, bookId), eq(factRevelations.visibility, visibility)))
+      .orderBy(asc(factRevelations.createdAt))
+      .all()
+      .map(mapFactRevelation);
   }
 }
 
@@ -1369,6 +1465,28 @@ function mapFact(row: typeof facts.$inferSelect) {
     sourceId: parseStableId(row.sourceId),
     sourceHash: parseContentHash(row.sourceHash),
     revision: row.revision,
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapFactRevelation(row: typeof factRevelations.$inferSelect) {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    factId: parseStableId(row.factId),
+    chapterId: parseStableId(row.chapterId),
+    sourceHash: parseContentHash(row.sourceHash),
+    textRange:
+      row.textRangeJson === null
+        ? null
+        : (parseJson(row.textRangeJson) as {
+            start: number;
+            end: number;
+            quoteHash: ReturnType<typeof parseContentHash>;
+          }),
+    visibility: row.visibility,
+    knownToEntityId: row.knownToEntityId === null ? null : parseStableId(row.knownToEntityId),
     createdAt: parseUtcDateTime(row.createdAt),
     updatedAt: parseUtcDateTime(row.updatedAt),
   };
