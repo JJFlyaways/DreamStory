@@ -44,6 +44,7 @@ import type {
   RunRecord,
 } from './types';
 import './styles.css';
+import './harness-layout.css';
 
 const planLabels: Record<PlanKind, string> = {
   book: '故事核心',
