@@ -45,6 +45,7 @@ import type {
   RunStepRecord,
   RunRecord,
   RunPersistenceRepository,
+  ThreadRepository,
 } from '@dreamstory/application';
 import { and, asc, desc, eq, lte } from 'drizzle-orm';
 
@@ -57,6 +58,8 @@ import {
   entities,
   facts,
   factRevelations,
+  storyThreads,
+  threadEvents,
   outboxJobs,
   planNodeVersions,
   planNodes,
@@ -82,6 +85,7 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     entities: new SqliteEntityRepository(database),
     facts: new SqliteFactRepository(database),
     factRevelations: new SqliteFactRevelationRepository(database),
+    threads: new SqliteThreadRepository(database),
     proposals: new SqliteProposalRepository(database),
     reviews: new SqliteReviewRepository(database),
     finalizations: new SqliteFinalizationRepository(database),
@@ -696,6 +700,143 @@ export class SqliteFactRevelationRepository implements FactRevelationRepository 
       .orderBy(asc(factRevelations.createdAt))
       .all()
       .map(mapFactRevelation);
+  }
+}
+
+export class SqliteThreadRepository implements ThreadRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async create(
+    thread: Parameters<ThreadRepository['create']>[0],
+    expectedBookRevision: number,
+  ) {
+    try {
+      return this.database.transaction((tx) => {
+        const book = tx.select().from(books).where(eq(books.id, thread.bookId)).get();
+        const duplicate = tx
+          .select()
+          .from(storyThreads)
+          .where(and(eq(storyThreads.bookId, thread.bookId), eq(storyThreads.name, thread.name)))
+          .get();
+        if (book === undefined || duplicate !== undefined || book.bookRevision !== expectedBookRevision) {
+          return null;
+        }
+        tx.insert(storyThreads)
+          .values({
+            id: thread.id,
+            bookId: thread.bookId,
+            kind: thread.kind,
+            name: thread.name,
+            plannedPayoff: thread.plannedPayoff,
+            status: thread.status,
+            createdAt: thread.createdAt,
+            updatedAt: thread.updatedAt,
+          })
+          .run();
+        const updated = tx
+          .update(books)
+          .set({ bookRevision: expectedBookRevision + 1, updatedAt: thread.updatedAt })
+          .where(and(eq(books.id, thread.bookId), eq(books.bookRevision, expectedBookRevision)))
+          .run();
+        if (updated.changes !== 1) throw new RevisionRaceError();
+        return { thread, bookRevision: expectedBookRevision + 1 };
+      });
+    } catch (error) {
+      if (error instanceof RevisionRaceError) return null;
+      throw error;
+    }
+  }
+
+  async get(bookId: string, id: string) {
+    const row = this.database
+      .select()
+      .from(storyThreads)
+      .where(and(eq(storyThreads.bookId, bookId), eq(storyThreads.id, id)))
+      .get();
+    return row === undefined ? null : mapThread(row);
+  }
+
+  async list(bookId: string) {
+    return this.database
+      .select()
+      .from(storyThreads)
+      .where(eq(storyThreads.bookId, bookId))
+      .orderBy(asc(storyThreads.updatedAt), asc(storyThreads.id))
+      .all()
+      .map(mapThread);
+  }
+
+  async appendEvent(
+    event: Parameters<ThreadRepository['appendEvent']>[0],
+    nextStatus: Parameters<ThreadRepository['appendEvent']>[1],
+    expectedBookRevision: number,
+  ) {
+    try {
+      return this.database.transaction((tx) => {
+        const book = tx.select().from(books).where(eq(books.id, event.bookId)).get();
+        const thread = tx
+          .select()
+          .from(storyThreads)
+          .where(and(eq(storyThreads.bookId, event.bookId), eq(storyThreads.id, event.threadId)))
+          .get();
+        const duplicate = tx
+          .select()
+          .from(threadEvents)
+          .where(eq(threadEvents.id, event.id))
+          .get();
+        if (
+          book === undefined ||
+          thread === undefined ||
+          duplicate !== undefined ||
+          thread.status !== 'open' ||
+          book.bookRevision !== expectedBookRevision
+        ) {
+          return null;
+        }
+        const row = {
+          id: event.id,
+          bookId: event.bookId,
+          threadId: event.threadId,
+          kind: event.kind,
+          chapterId: event.chapterId,
+          evidenceKind: event.evidenceKind,
+          sourceId: event.sourceId,
+          sourceHash: event.sourceHash,
+          textRangeJson: event.textRange === null ? null : stringifyJson(event.textRange),
+          createdAt: event.createdAt,
+          updatedAt: event.updatedAt,
+        };
+        tx.insert(threadEvents).values(row).run();
+        tx.update(storyThreads)
+          .set({ status: nextStatus, updatedAt: event.updatedAt })
+          .where(eq(storyThreads.id, event.threadId))
+          .run();
+        const updated = tx
+          .update(books)
+          .set({ bookRevision: expectedBookRevision + 1, updatedAt: event.updatedAt })
+          .where(and(eq(books.id, event.bookId), eq(books.bookRevision, expectedBookRevision)))
+          .run();
+        if (updated.changes !== 1) throw new RevisionRaceError();
+        return {
+          event,
+          thread: { ...mapThread(thread), status: nextStatus, updatedAt: event.updatedAt },
+          bookRevision: expectedBookRevision + 1,
+        };
+      });
+    } catch (error) {
+      if (error instanceof RevisionRaceError) return null;
+      throw error;
+    }
+  }
+
+  async listEvents(bookId: string, threadId: string) {
+    return this.database
+      .select()
+      .from(threadEvents)
+      .where(and(eq(threadEvents.bookId, bookId), eq(threadEvents.threadId, threadId)))
+      .orderBy(asc(threadEvents.createdAt), asc(threadEvents.id))
+      .all()
+      .map(mapThreadEvent);
   }
 }
 
@@ -1487,6 +1628,42 @@ function mapFactRevelation(row: typeof factRevelations.$inferSelect) {
           }),
     visibility: row.visibility,
     knownToEntityId: row.knownToEntityId === null ? null : parseStableId(row.knownToEntityId),
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapThread(row: typeof storyThreads.$inferSelect) {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    kind: row.kind,
+    name: row.name,
+    plannedPayoff: row.plannedPayoff,
+    status: row.status,
+    createdAt: parseUtcDateTime(row.createdAt),
+    updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapThreadEvent(row: typeof threadEvents.$inferSelect) {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    threadId: parseStableId(row.threadId),
+    kind: row.kind,
+    chapterId: row.chapterId === null ? null : parseStableId(row.chapterId),
+    evidenceKind: row.evidenceKind,
+    sourceId: parseStableId(row.sourceId),
+    sourceHash: parseContentHash(row.sourceHash),
+    textRange:
+      row.textRangeJson === null
+        ? null
+        : (parseJson(row.textRangeJson) as {
+            start: number;
+            end: number;
+            quoteHash: ReturnType<typeof parseContentHash>;
+          }),
     createdAt: parseUtcDateTime(row.createdAt),
     updatedAt: parseUtcDateTime(row.updatedAt),
   };

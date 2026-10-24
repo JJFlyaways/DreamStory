@@ -48,6 +48,10 @@ export const reviewDispositions = ['open', 'accept', 'ignore', 'intentional'] as
 export const entityKinds = ['character', 'location', 'organization', 'item', 'world'] as const;
 export const factSourceKinds = ['author', 'finalization', 'import'] as const;
 export const revelationVisibilities = ['author_truth', 'character_known', 'reader_known'] as const;
+export const threadKinds = ['storyline', 'foreshadow'] as const;
+export const threadStatuses = ['open', 'resolved', 'dropped', 'superseded'] as const;
+export const threadEventKinds = ['planted', 'advanced', 'resolved', 'dropped'] as const;
+export const threadEvidenceKinds = ['author', 'finalization'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -133,6 +137,45 @@ export const factRevelations = sqliteTable(
     index('fact_revelations_book_chapter_idx').on(table.bookId, table.chapterId),
     index('fact_revelations_book_visibility_idx').on(table.bookId, table.visibility),
     index('fact_revelations_fact_idx').on(table.bookId, table.factId),
+  ],
+);
+
+export const storyThreads = sqliteTable(
+  'story_threads',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    kind: text('kind', { enum: threadKinds }).notNull(),
+    name: text('name').notNull(),
+    plannedPayoff: text('planned_payoff').notNull(),
+    status: text('status', { enum: threadStatuses }).notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    unique('story_threads_book_name_unique').on(table.bookId, table.name),
+    index('story_threads_book_status_idx').on(table.bookId, table.status, table.updatedAt),
+  ],
+);
+
+export const threadEvents = sqliteTable(
+  'thread_events',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    threadId: text('thread_id').notNull(),
+    kind: text('kind', { enum: threadEventKinds }).notNull(),
+    chapterId: text('chapter_id'),
+    evidenceKind: text('evidence_kind', { enum: threadEvidenceKinds }).notNull(),
+    sourceId: text('source_id').notNull(),
+    sourceHash: text('source_hash').notNull(),
+    textRangeJson: text('text_range_json'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('thread_events_book_thread_idx').on(table.bookId, table.threadId, table.createdAt),
+    index('thread_events_book_chapter_idx').on(table.bookId, table.chapterId),
   ],
 );
 
@@ -417,6 +460,8 @@ export const schema = {
   entities,
   facts,
   factRevelations,
+  storyThreads,
+  threadEvents,
   planNodes,
   planNodeVersions,
   chapters,

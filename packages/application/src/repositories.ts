@@ -23,6 +23,9 @@ import type {
   RunIntent,
   RunStatus,
   StableId,
+  StoryThreadRecord,
+  ThreadEventRecord,
+  ThreadStatus,
 } from '@dreamstory/contracts';
 import type { RunPersistenceRepository } from './runs.js';
 
@@ -212,6 +215,25 @@ export interface FactRevelationRepository {
   ): Promise<readonly FactRevelationRecord[]>;
 }
 
+export interface ThreadRepository {
+  create(
+    thread: StoryThreadRecord,
+    expectedBookRevision: BookRevision,
+  ): Promise<{ thread: StoryThreadRecord; bookRevision: BookRevision } | null>;
+  get(bookId: StableId, id: StableId): Promise<StoryThreadRecord | null>;
+  list(bookId: StableId): Promise<readonly StoryThreadRecord[]>;
+  appendEvent(
+    event: ThreadEventRecord,
+    nextStatus: ThreadStatus,
+    expectedBookRevision: BookRevision,
+  ): Promise<{
+    event: ThreadEventRecord;
+    thread: StoryThreadRecord;
+    bookRevision: BookRevision;
+  } | null>;
+  listEvents(bookId: StableId, threadId: StableId): Promise<readonly ThreadEventRecord[]>;
+}
+
 export interface ProposalRecord {
   id: StableId;
   bookId: StableId;
@@ -339,6 +361,7 @@ export interface RepositorySet {
   entities: EntityRepository;
   facts: FactRepository;
   factRevelations: FactRevelationRepository;
+  threads: ThreadRepository;
   proposals: ProposalRepository;
   reviews: ReviewRepository;
   finalizations: FinalizationRepository;

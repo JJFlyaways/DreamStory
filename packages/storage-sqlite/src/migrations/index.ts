@@ -6,6 +6,7 @@ import { reviewProposalMigration } from './0005-review-proposals.js';
 import { finalizationsMigration } from './0006-finalizations.js';
 import { continuityMigration } from './0007-continuity.js';
 import { factRevelationsMigration } from './0008-fact-revelations.js';
+import { threadsMigration } from './0009-threads.js';
 
 export const INITIAL_MIGRATIONS = [
   initialOperationalTablesMigration,
@@ -16,4 +17,5 @@ export const INITIAL_MIGRATIONS = [
   finalizationsMigration,
   continuityMigration,
   factRevelationsMigration,
+  threadsMigration,
 ] as const;
