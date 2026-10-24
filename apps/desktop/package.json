@@ -1,0 +1,19 @@
+{
+  "name": "@dreamstory/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DreamStory 的 Electron 开发客户端",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "pnpm --filter @dreamstory/server build && pnpm --filter @dreamstory/web build && tsc -p tsconfig.json",
+    "build:main": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "pnpm run build && electron .",
+    "start": "pnpm run build && electron ."
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "electron": "35.7.5"
+  }
+}

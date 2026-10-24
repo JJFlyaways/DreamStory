@@ -1,5 +1,7 @@
 packages:
   - apps/*
   - packages/*
+allowBuilds:
+  electron@35.7.5: true
 minimumReleaseAgeExclude:
   - vite@8.3.5
