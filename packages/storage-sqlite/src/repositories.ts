@@ -5,7 +5,12 @@ import {
   parseStableId,
   parseUtcDateTime,
 } from '@dreamstory/contracts';
-import type { ClientRequestId, IsoUtcDateTime, StableId } from '@dreamstory/contracts';
+import type {
+  ClientRequestId,
+  InvalidationObjectKind,
+  IsoUtcDateTime,
+  StableId,
+} from '@dreamstory/contracts';
 import type {
   BookChanges,
   BookLeaseRecord,
@@ -26,6 +31,7 @@ import type {
   FactAppendInput,
   FactRepository,
   InputSnapshotRecord,
+  InvalidationRepository,
   ModelCallRecord,
   OutboxJobRecord,
   OutboxJobRepository,
@@ -75,6 +81,7 @@ import {
   reviews,
   reviewFindings,
   finalizations,
+  derivedInvalidations,
 } from './schema.js';
 
 export function createSqliteRepositories(database: StoryDatabase): RepositorySet {
@@ -88,6 +95,7 @@ export function createSqliteRepositories(database: StoryDatabase): RepositorySet
     factRevelations: new SqliteFactRevelationRepository(database),
     threads: new SqliteThreadRepository(database),
     search: new SqliteSearchRepository(database),
+    invalidations: new SqliteInvalidationRepository(database),
     proposals: new SqliteProposalRepository(database),
     reviews: new SqliteReviewRepository(database),
     finalizations: new SqliteFinalizationRepository(database),
@@ -1025,6 +1033,51 @@ export class SqliteSearchRepository implements SearchRepository {
   }
 }
 
+export class SqliteInvalidationRepository implements InvalidationRepository {
+  constructor(private readonly database: StoryDatabase) {}
+
+  async list(
+    bookId: string,
+    status?: Parameters<InvalidationRepository['list']>[1],
+  ) {
+    const rows =
+      status === undefined
+        ? this.database
+            .select()
+            .from(derivedInvalidations)
+            .where(eq(derivedInvalidations.bookId, bookId))
+            .orderBy(asc(derivedInvalidations.createdAt))
+            .all()
+        : this.database
+            .select()
+            .from(derivedInvalidations)
+            .where(
+              and(
+                eq(derivedInvalidations.bookId, bookId),
+                eq(derivedInvalidations.status, status),
+              ),
+            )
+            .orderBy(asc(derivedInvalidations.createdAt))
+            .all();
+    return rows.map(mapInvalidation);
+  }
+
+  async clear(id: string, clearedAt: string) {
+    const result = this.database
+      .update(derivedInvalidations)
+      .set({ status: 'cleared', clearedAt })
+      .where(and(eq(derivedInvalidations.id, id), eq(derivedInvalidations.status, 'pending')))
+      .run();
+    if (result.changes !== 1) return null;
+    const row = this.database
+      .select()
+      .from(derivedInvalidations)
+      .where(eq(derivedInvalidations.id, id))
+      .get();
+    return row === undefined ? null : mapInvalidation(row);
+  }
+}
+
 interface EntityMentionRow {
   entity_id: string;
   match_kind: 'name' | 'alias';
@@ -1363,6 +1416,136 @@ export class SqliteFinalizationRepository implements FinalizationRepository {
             updatedAt: job.updatedAt,
           })
           .run();
+      }
+      if (finalization.supersedesId !== null) {
+        const superseded = tx
+          .select()
+          .from(finalizations)
+          .where(eq(finalizations.id, finalization.supersedesId))
+          .get();
+        if (superseded !== undefined) {
+          const addInvalidation = (objectKind: InvalidationObjectKind, objectId: string) => {
+            tx.insert(derivedInvalidations)
+              .values({
+                id: `invalidate_${objectKind}_${objectId}_${superseded.id}`,
+                bookId: chapter.bookId,
+                objectKind,
+                objectId,
+                supersededFinalizationId: superseded.id,
+                replacementFinalizationId: finalization.id,
+                oldSourceHash: superseded.contentHash,
+                newSourceHash: finalization.contentHash,
+                reason: 'superseded_finalization',
+                status: 'pending',
+                createdAt: finalization.committedAt,
+                clearedAt: null,
+              })
+              .onConflictDoNothing()
+              .run();
+          };
+
+          addInvalidation('chapter_projection', chapter.id);
+          addInvalidation('search_index', chapter.id);
+
+          const snapshots = tx
+            .select()
+            .from(inputSnapshots)
+            .where(eq(inputSnapshots.bookId, chapter.bookId))
+            .all()
+            .filter(
+              (snapshot) =>
+                snapshot.manifestJson.includes(superseded.id) ||
+                snapshot.manifestJson.includes(superseded.contentHash),
+            );
+          for (const snapshot of snapshots) {
+            addInvalidation('input_snapshot', snapshot.id);
+            const affectedRuns = tx
+              .select()
+              .from(runs)
+              .where(eq(runs.inputSnapshotId, snapshot.id))
+              .all();
+            for (const run of affectedRuns) {
+              addInvalidation('run', run.id);
+              tx.update(runs)
+                .set({ status: 'stale', updatedAt: finalization.committedAt })
+                .where(eq(runs.id, run.id))
+                .run();
+              for (const artifact of tx
+                .select()
+                .from(runArtifacts)
+                .where(eq(runArtifacts.runId, run.id))
+                .all()) {
+                addInvalidation('run_artifact', artifact.id);
+              }
+              for (const proposal of tx
+                .select()
+                .from(proposals)
+                .where(and(eq(proposals.bookId, chapter.bookId), eq(proposals.sourceRunId, run.id)))
+                .all()) {
+                if (proposal.status === 'pending') {
+                  tx.update(proposals)
+                    .set({
+                      status: 'stale',
+                      revision: proposal.revision + 1,
+                      updatedAt: finalization.committedAt,
+                    })
+                    .where(eq(proposals.id, proposal.id))
+                    .run();
+                  addInvalidation('proposal', proposal.id);
+                }
+              }
+              const affectedDrafts = tx
+                .select()
+                .from(draftVersions)
+                .where(eq(draftVersions.sourceRunId, run.id))
+                .all();
+              for (const draft of affectedDrafts) {
+                for (const review of tx
+                  .select()
+                  .from(reviews)
+                  .where(eq(reviews.draftVersionId, draft.id))
+                  .all()) {
+                  addInvalidation('review', review.id);
+                }
+              }
+            }
+          }
+
+          for (const fact of tx
+            .select()
+            .from(facts)
+            .where(
+              and(
+                eq(facts.bookId, chapter.bookId),
+                eq(facts.sourceKind, 'finalization'),
+                eq(facts.sourceId, superseded.id),
+              ),
+            )
+            .all()) {
+            addInvalidation('fact', fact.id);
+          }
+          for (const revelation of tx
+            .select()
+            .from(factRevelations)
+            .where(
+              and(
+                eq(factRevelations.bookId, chapter.bookId),
+                eq(factRevelations.sourceHash, superseded.contentHash),
+              ),
+            )
+            .all()) {
+            addInvalidation('fact_revelation', revelation.id);
+          }
+          for (const event of tx
+            .select()
+            .from(threadEvents)
+            .where(
+              and(eq(threadEvents.bookId, chapter.bookId), eq(threadEvents.sourceId, superseded.id)),
+            )
+            .all()) {
+            addInvalidation('thread_event', event.id);
+          }
+        }
       }
       return { finalization, bookRevision };
     });
@@ -1904,6 +2087,23 @@ function mapThreadEvent(row: typeof threadEvents.$inferSelect) {
           }),
     createdAt: parseUtcDateTime(row.createdAt),
     updatedAt: parseUtcDateTime(row.updatedAt),
+  };
+}
+
+function mapInvalidation(row: typeof derivedInvalidations.$inferSelect) {
+  return {
+    id: parseStableId(row.id),
+    bookId: parseStableId(row.bookId),
+    objectKind: row.objectKind,
+    objectId: parseStableId(row.objectId),
+    supersededFinalizationId: parseStableId(row.supersededFinalizationId),
+    replacementFinalizationId: parseStableId(row.replacementFinalizationId),
+    oldSourceHash: parseContentHash(row.oldSourceHash),
+    newSourceHash: parseContentHash(row.newSourceHash),
+    reason: row.reason,
+    status: row.status,
+    createdAt: parseUtcDateTime(row.createdAt),
+    clearedAt: row.clearedAt === null ? null : parseUtcDateTime(row.clearedAt),
   };
 }
 

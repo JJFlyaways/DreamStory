@@ -52,6 +52,19 @@ export const threadKinds = ['storyline', 'foreshadow'] as const;
 export const threadStatuses = ['open', 'resolved', 'dropped', 'superseded'] as const;
 export const threadEventKinds = ['planted', 'advanced', 'resolved', 'dropped'] as const;
 export const threadEvidenceKinds = ['author', 'finalization'] as const;
+export const invalidationObjectKinds = [
+  'chapter_projection',
+  'search_index',
+  'input_snapshot',
+  'run',
+  'run_artifact',
+  'proposal',
+  'review',
+  'fact',
+  'fact_revelation',
+  'thread_event',
+] as const;
+export const invalidationStatuses = ['pending', 'cleared'] as const;
 
 export const books = sqliteTable(
   'books',
@@ -176,6 +189,32 @@ export const threadEvents = sqliteTable(
   (table) => [
     index('thread_events_book_thread_idx').on(table.bookId, table.threadId, table.createdAt),
     index('thread_events_book_chapter_idx').on(table.bookId, table.chapterId),
+  ],
+);
+
+export const derivedInvalidations = sqliteTable(
+  'derived_invalidations',
+  {
+    id: text('id').primaryKey(),
+    bookId: text('book_id').notNull(),
+    objectKind: text('object_kind', { enum: invalidationObjectKinds }).notNull(),
+    objectId: text('object_id').notNull(),
+    supersededFinalizationId: text('superseded_finalization_id').notNull(),
+    replacementFinalizationId: text('replacement_finalization_id').notNull(),
+    oldSourceHash: text('old_source_hash').notNull(),
+    newSourceHash: text('new_source_hash').notNull(),
+    reason: text('reason').notNull(),
+    status: text('status', { enum: invalidationStatuses }).notNull(),
+    createdAt: text('created_at').notNull(),
+    clearedAt: text('cleared_at'),
+  },
+  (table) => [
+    unique('derived_invalidations_object_source_unique').on(
+      table.objectKind,
+      table.objectId,
+      table.supersededFinalizationId,
+    ),
+    index('derived_invalidations_book_status_idx').on(table.bookId, table.status, table.createdAt),
   ],
 );
 
@@ -462,6 +501,7 @@ export const schema = {
   factRevelations,
   storyThreads,
   threadEvents,
+  derivedInvalidations,
   planNodes,
   planNodeVersions,
   chapters,

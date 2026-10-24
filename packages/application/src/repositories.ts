@@ -8,6 +8,8 @@ import type {
   FactRecord,
   FactRevelationRecord,
   FactSourceKind,
+  DerivedInvalidationRecord,
+  InvalidationStatus,
   IsoUtcDateTime,
   PlanContent,
   PlanKind,
@@ -241,6 +243,14 @@ export interface SearchRepository {
   search(bookId: StableId, query: string, limit: number): Promise<readonly SearchHit[]>;
 }
 
+export interface InvalidationRepository {
+  list(
+    bookId: StableId,
+    status?: InvalidationStatus,
+  ): Promise<readonly DerivedInvalidationRecord[]>;
+  clear(id: StableId, clearedAt: IsoUtcDateTime): Promise<DerivedInvalidationRecord | null>;
+}
+
 export interface ProposalRecord {
   id: StableId;
   bookId: StableId;
@@ -370,6 +380,7 @@ export interface RepositorySet {
   factRevelations: FactRevelationRepository;
   threads: ThreadRepository;
   search: SearchRepository;
+  invalidations: InvalidationRepository;
   proposals: ProposalRepository;
   reviews: ReviewRepository;
   finalizations: FinalizationRepository;

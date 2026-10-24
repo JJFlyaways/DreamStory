@@ -8,6 +8,7 @@ import { continuityMigration } from './0007-continuity.js';
 import { factRevelationsMigration } from './0008-fact-revelations.js';
 import { threadsMigration } from './0009-threads.js';
 import { searchMigration } from './0010-search.js';
+import { invalidationsMigration } from './0011-invalidations.js';
 
 export const INITIAL_MIGRATIONS = [
   initialOperationalTablesMigration,
@@ -20,4 +21,5 @@ export const INITIAL_MIGRATIONS = [
   factRevelationsMigration,
   threadsMigration,
   searchMigration,
+  invalidationsMigration,
 ] as const;
