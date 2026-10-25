@@ -1,0 +1,2 @@
+# Pinned Harness bundles are generated upstream artifacts; preserve their exact bytes.
+apps/web/harness/runtime/** -whitespace

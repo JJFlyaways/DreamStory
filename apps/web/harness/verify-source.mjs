@@ -1,3 +1,5 @@
+/* global URL, process, console */
+
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';

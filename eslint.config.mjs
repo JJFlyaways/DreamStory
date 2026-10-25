@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['.paseo/**', '**/dist/**', '**/node_modules/**'],
+    ignores: ['.paseo/**', '**/dist/**', '**/node_modules/**', 'apps/web/harness/runtime/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

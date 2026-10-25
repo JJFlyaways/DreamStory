@@ -10,8 +10,8 @@
     }
   },
   "scripts": {
-    "build": "tsc -b && vite build",
-    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && node harness/build.mjs",
+    "dev": "pnpm build && vite preview --host 127.0.0.1",
     "start": "pnpm build && vite preview --host 127.0.0.1",
     "test": "pnpm build && node --test test/*.test.mjs"
   },
