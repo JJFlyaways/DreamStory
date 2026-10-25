@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "tsc -b && node harness/build.mjs",
+    "build:gate-a": "tsc -b && DREAMSTORY_WEB_MODE=gate-a node harness/build.mjs",
     "dev": "pnpm build && vite preview --host 127.0.0.1",
     "start": "pnpm build && vite preview --host 127.0.0.1",
     "test": "pnpm build && node --test test/*.test.mjs"
