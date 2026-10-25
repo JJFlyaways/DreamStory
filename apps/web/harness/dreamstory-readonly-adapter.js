@@ -1,4 +1,4 @@
-/* global URL, Response, ReadableStream, structuredClone, console */
+/* global URL, Response, ReadableStream, structuredClone, console, TextEncoder, TextDecoderStream */
 
 // P3.6-4: translate DreamStory's persisted read model into Harness read surfaces.
 // This adapter owns no visible components and exposes no authoring command.
@@ -23,13 +23,33 @@
     sessions: [],
     projections: new Map(),
     snapshots: new Map(),
+    queues: new Map(),
+    activeRuns: new Map(),
   };
+  let csrfToken;
 
   async function getJson(path) {
     const response = await nativeFetch(`${apiBase}${path}`, { credentials: 'include' });
     if (!response.ok)
       throw new Error(`DreamStory read ${path} returned HTTP ${String(response.status)}`);
     const payload = await response.json();
+    return payload.data;
+  }
+
+  async function writeJson(path, body) {
+    if (csrfToken === undefined) {
+      const sessionResponse = await nativeFetch(`${apiBase}/session`, { credentials: 'include' });
+      const sessionPayload = await sessionResponse.json();
+      csrfToken = sessionPayload.data.csrfToken;
+    }
+    const response = await nativeFetch(`${apiBase}${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json', 'x-story-csrf': csrfToken },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error?.message ?? `DreamStory write ${path} failed`);
     return payload.data;
   }
 
@@ -55,6 +75,41 @@
     return undefined;
   }
 
+  function bookForSession(sessionId) {
+    return catalog.books.find((item) => item.sessionId === sessionId);
+  }
+
+  function queueForSession(sessionId) {
+    let queue = catalog.queues.get(sessionId);
+    if (queue === undefined) {
+      queue = { items: [], waiters: [] };
+      catalog.queues.set(sessionId, queue);
+    }
+    return queue;
+  }
+
+  function pushSessionEvent(sessionId, record) {
+    const item = bookForSession(sessionId);
+    if (item !== undefined) {
+      item.records.push(record);
+      item.snapshot.records = item.records;
+      item.snapshot.cursor = record.event.seq;
+    }
+    const queue = queueForSession(sessionId);
+    const waiter = queue.waiters.shift();
+    if (waiter === undefined) queue.items.push(record);
+    else waiter(record);
+  }
+
+  function nextSessionEvent(sessionId) {
+    const queue = queueForSession(sessionId);
+    const item = queue.items.shift();
+    if (item !== undefined) return Promise.resolve(item);
+    return new Promise((resolve) => {
+      queue.waiters.push(resolve);
+    });
+  }
+
   function stringId(prefix, value) {
     return `${prefix}-${String(value).replace(/[^a-zA-Z0-9_-]/gu, '-')}`;
   }
@@ -71,8 +126,14 @@
           status: chapter.currentFinalizationId === null ? 'pending' : 'completed',
         })),
         permissions: {
-          options: [],
-          currentValue: 'read-only',
+          options: [
+            {
+              value: 'workspace-write',
+              name: 'workspace-write',
+              description: 'Write through DreamStory author commands within the current book.',
+            },
+          ],
+          currentValue: 'workspace-write',
         },
         plan: { active: false, pending: false },
         goal: null,
@@ -253,6 +314,242 @@
     await catalog.loading;
   }
 
+  function newRequestId() {
+    return globalThis.crypto?.randomUUID?.() ?? `dreamstory-${String(Date.now())}`;
+  }
+
+  function textContent(content) {
+    return content
+      .filter((part) => part?.type === 'text')
+      .map((part) => part.text)
+      .join('\n')
+      .trim();
+  }
+
+  function appendPromptEvents(item, text, assistantText) {
+    const time = Date.now();
+    let seq = item.records.at(-1)?.event?.seq ?? -1;
+    const turn = item.records.filter((record) => record.event.type === 'turn/start').length;
+    pushSessionEvent(item.sessionId, event(++seq, 'turn/start', { turn }, time));
+    pushSessionEvent(
+      item.sessionId,
+      event(
+        ++seq,
+        'user/message',
+        {
+          content: [{ type: 'text', text }],
+          source: { kind: 'user' },
+          role: 'user',
+          id: stringId('prompt-user', `${item.sessionId}-${String(seq)}`),
+        },
+        time,
+        'append',
+      ),
+    );
+    if (assistantText !== undefined) {
+      pushSessionEvent(
+        item.sessionId,
+        event(
+          ++seq,
+          'assistant/message',
+          {
+            turn,
+            step: 0,
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: assistantText }],
+              source: { kind: 'model', provider: 'dreamstory', model: 'adapter' },
+              id: stringId('prompt-assistant', `${item.sessionId}-${String(seq)}`),
+            },
+          },
+          time,
+          'append',
+        ),
+      );
+    }
+    pushSessionEvent(
+      item.sessionId,
+      event(
+        seq + 1,
+        'turn/end',
+        {
+          turn,
+          reason: { kind: 'completed' },
+        },
+        time,
+      ),
+    );
+  }
+
+  function commandOf(text) {
+    const match = /^\/(plan|write|review|revise|context|finalize|export)\b(?:\s+(.*))?$/iu.exec(
+      text,
+    );
+    return match === null
+      ? undefined
+      : { name: match[1].toLowerCase(), argument: match[2]?.trim() ?? '' };
+  }
+
+  async function modelProfile() {
+    const profiles = await getJson('/model-profiles');
+    return profiles.find((profile) => profile.credentialStatus !== 'missing') ?? profiles[0];
+  }
+
+  async function currentDraft(item) {
+    const chapter = item.chapters[0];
+    if (chapter?.currentDraftId === null || chapter?.currentDraftId === undefined) return undefined;
+    return getJson(
+      `/books/${encodeURIComponent(item.book.id)}/chapters/${encodeURIComponent(chapter.id)}/drafts/${encodeURIComponent(chapter.currentDraftId)}`,
+    );
+  }
+
+  async function contentHash(value) {
+    const digest = await globalThis.crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(value),
+    );
+    return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  async function streamRun(item, runId, intent) {
+    try {
+      const response = await nativeFetch(
+        `${apiBase}/books/${encodeURIComponent(item.book.id)}/runs/${encodeURIComponent(runId)}/events`,
+        { credentials: 'include' },
+      );
+      if (!response.ok || response.body === null)
+        throw new Error(`run event stream returned HTTP ${String(response.status)}`);
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = '';
+      let output = '';
+      const consume = (chunk) => {
+        buffer += chunk;
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const eventName = /^event: ?([^\n]+)/mu.exec(frame)?.[1] ?? '';
+          const data = /^data: ?([^\n]+)/mu.exec(frame)?.[1];
+          if (data === undefined) continue;
+          let payload;
+          try {
+            payload = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          if (eventName === 'output.delta' && typeof payload.text === 'string')
+            output += payload.text;
+          if (eventName === 'run.failed') output += `\n运行失败：${payload.message ?? '未知错误'}`;
+        }
+      };
+      for (;;) {
+        const next = await reader.read();
+        if (next.done) break;
+        consume(next.value);
+      }
+      appendPromptEvents(
+        item,
+        `/${intent}`,
+        output || '运行已结束，候选产物可在 DreamStory 业务面板中查看。',
+      );
+    } catch (error) {
+      appendPromptEvents(
+        item,
+        `/${intent}`,
+        `运行事件读取失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      catalog.activeRuns.delete(item.sessionId);
+    }
+  }
+
+  async function startRunForPrompt(item, intent, text) {
+    const chapter = item.chapters[0];
+    const profile = await modelProfile();
+    if (chapter === undefined) throw new Error('当前作品还没有章节计划。');
+    if (profile === undefined) throw new Error('DreamStory 尚未配置可用模型档案。');
+    const run = await writeJson(`/books/${encodeURIComponent(item.book.id)}/runs`, {
+      clientRequestId: newRequestId(),
+      expectedBookRevision: item.book.bookRevision,
+      intent,
+      target: { planId: chapter.planNodeId, chapterNumber: chapter.chapterNumber },
+      scope: { chapterNumbers: [chapter.chapterNumber] },
+      modelProfileId: profile.id,
+    });
+    appendPromptEvents(item, text, `已启动 ${intent} 运行：${run.id}`);
+    catalog.activeRuns.set(item.sessionId, run.id);
+    void streamRun(item, run.id, intent);
+    return success({ accepted: true });
+  }
+
+  async function exportForPrompt(item, text) {
+    const result = await writeJson(`/books/${encodeURIComponent(item.book.id)}/exports`, {
+      format: 'markdown',
+    });
+    appendPromptEvents(item, text, `导出任务已完成：${result.fileName}`);
+    return success({ accepted: true });
+  }
+
+  async function finalizeForPrompt(item, text) {
+    const chapter = item.chapters[0];
+    const draft = await currentDraft(item);
+    if (chapter === undefined || draft === undefined)
+      throw new Error('当前作品没有可定稿的完整草稿。');
+    const result = await writeJson(
+      `/books/${encodeURIComponent(item.book.id)}/chapters/${encodeURIComponent(chapter.id)}/finalizations`,
+      {
+        clientRequestId: newRequestId(),
+        expectedBookRevision: item.book.bookRevision,
+        expectedDraftRevision: draft.revision,
+        draftVersionId: draft.id,
+        contentHash: await contentHash(draft.content),
+      },
+    );
+    appendPromptEvents(item, text, `定稿已提交：${result.finalization?.id ?? '已保存'}`);
+    return success({ accepted: true });
+  }
+
+  async function contextForPrompt(item, text) {
+    const chapter = item.chapters[0];
+    const profile = await modelProfile();
+    if (chapter === undefined || profile === undefined)
+      throw new Error('上下文预览缺少章节或模型档案。');
+    const preview = await writeJson(`/books/${encodeURIComponent(item.book.id)}/context/preview`, {
+      expectedBookRevision: item.book.bookRevision,
+      intent: 'draft_chapter',
+      target: { planId: chapter.planNodeId, chapterNumber: chapter.chapterNumber },
+      modelProfileId: profile.id,
+      maxInputTokens: 12000,
+    });
+    appendPromptEvents(
+      item,
+      text,
+      `上下文已检查：${preview.sourceManifest?.sourceCount ?? preview.sourceManifest?.length ?? 0} 个来源。`,
+    );
+    return success({ accepted: true });
+  }
+
+  async function promptForSession(payload) {
+    await loadCatalog();
+    const sessionId = sessionIdOf(payload);
+    const item = bookForSession(sessionId);
+    const request = requestOf(payload);
+    const text = textContent(request?.content ?? []);
+    if (item === undefined || text.length === 0) return readonlyFailure('session/prompt');
+    const command = commandOf(text);
+    if (command === undefined) return readonlyFailure('session/prompt');
+    if (command.name === 'export') return exportForPrompt(item, text);
+    if (command.name === 'finalize') return finalizeForPrompt(item, text);
+    if (command.name === 'context') return contextForPrompt(item, text);
+    const intent = {
+      plan: 'plan_chapter',
+      write: 'draft_chapter',
+      review: 'review_chapter',
+      revise: 'revise_chapter',
+    }[command.name];
+    if (intent === undefined) return readonlyFailure('session/prompt');
+    return startRunForPrompt(item, intent, text);
+  }
+
   function stream(value) {
     return (async function* () {
       yield structuredClone(value);
@@ -270,6 +567,21 @@
       case 'session/projections': {
         const id = sessionIdOf(payload);
         return success(structuredClone(catalog.projections.get(id) ?? null));
+      }
+      case 'session/prompt':
+        return promptForSession(payload);
+      case 'session/cancel': {
+        const id = sessionIdOf(payload);
+        const runId = catalog.activeRuns.get(id);
+        if (runId === undefined) return success({ cancelled: false });
+        const item = bookForSession(id);
+        if (item === undefined) return readonlyFailure('session/cancel');
+        await writeJson(
+          `/books/${encodeURIComponent(item.book.id)}/runs/${encodeURIComponent(runId)}/cancel`,
+          {},
+        );
+        catalog.activeRuns.delete(id);
+        return success({ cancelled: true });
       }
       case 'settings/describe':
         return success({
@@ -311,11 +623,17 @@
       case 'account/ackBonusNotified':
       case 'schedule/catalog':
       case 'schedule/list':
+      case 'skills/list':
       case 'commands/list':
-        return success(endpoint === 'account/ackBonusNotified' ? true : []);
+        return success(
+          endpoint === 'account/ackBonusNotified'
+            ? true
+            : endpoint === 'skills/list'
+              ? { skills: [] }
+              : [],
+        );
       case 'session/create':
       case 'workspace/create':
-      case 'session/prompt':
       case 'commands/execute':
         return readonlyFailure(endpoint);
       default:
@@ -356,7 +674,7 @@
     }
     if (endpoint === 'session/follow') {
       const id = sessionIdOf(payload);
-      yield* stream(
+      yield structuredClone(
         catalog.snapshots.get(id) ?? {
           type: 'snapshot',
           header: { version: 3, id, createdAt: Date.now(), cwd: '', isSeeded: true },
@@ -367,7 +685,7 @@
           assistantStream: { revision: 0 },
         },
       );
-      return;
+      for (;;) yield structuredClone(await nextSessionEvent(id));
     }
     if (endpoint === 'account/watch') {
       yield* stream({ status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } });
