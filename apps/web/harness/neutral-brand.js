@@ -13,7 +13,8 @@ window.__ModuleLoader__.load({
         style: {
           display: 'inline-block',
           width: size,
-          height: size,
+          height: size === 24 ? 17.66 : (size * 25) / 34,
+          boxSizing: 'border-box',
           flex: 'none',
           borderRadius: '50%',
           border: '1px solid currentColor',
@@ -23,7 +24,7 @@ window.__ModuleLoader__.load({
     const NeutralName = () =>
       jsx('span', {
         'data-brand-placeholder': 'true',
-        style: { display: 'inline-block', width: 96, height: 18, opacity: 0.35 },
+        style: { display: 'inline-block', width: 156, height: 24, opacity: 0.35 },
       });
     return {
       inject: ['slots'],
